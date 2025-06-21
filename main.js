@@ -310,14 +310,15 @@ async function createPeerConnection() {
         updateStatus(`接続状態: ${peerConnection.connectionState}`);
         
         if (peerConnection.connectionState === 'connected') {
-            updateStatus('接続完了');
             sessionActive = true;
             connectionEstablished = true;
             isWaitingForGuest = false;
             reconnectAttempts = 0;
             clearKeywordTimer();
             stopAllPolling(); // 接続完了時にポーリング停止
-            updateConnectionInfo(); // 接続方法を表示
+            
+            // 接続方法を取得してステータスに表示
+            setTimeout(() => updateConnectionInfo(true), 1000);
         } else if (peerConnection.connectionState === 'disconnected' || 
                    peerConnection.connectionState === 'failed') {
             if (connectionEstablished) {
@@ -768,40 +769,60 @@ function updateStatus(text) {
     elements.statusText.textContent = text;
 }
 
-function updateConnectionInfo() {
+async function getConnectionType() {
+    if (!peerConnection) return null;
+    
+    try {
+        const stats = await peerConnection.getStats();
+        let connectionType = '';
+        
+        stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                const localCandidate = stats.get(report.localCandidateId);
+                const remoteCandidate = stats.get(report.remoteCandidateId);
+                
+                if (localCandidate && remoteCandidate) {
+                    const localType = localCandidate.candidateType;
+                    const remoteType = remoteCandidate.candidateType;
+                    connectionType = `${localType} ↔ ${remoteType}`;
+                    
+                    console.log('接続方法:', connectionType);
+                    console.log('ローカル:', localCandidate);
+                    console.log('リモート:', remoteCandidate);
+                }
+            }
+        });
+        
+        return connectionType || null;
+    } catch (err) {
+        console.log('Stats取得エラー:', err);
+        return null;
+    }
+}
+
+async function updateConnectionInfo(shouldUpdateStatus = false) {
     if (!peerConnection) return;
     
     const connectionState = peerConnection.connectionState;
     const iceConnectionState = peerConnection.iceConnectionState;
     const iceGatheringState = peerConnection.iceGatheringState;
     
-    // 詳細な接続情報を表示
-    const info = `接続: ${connectionState} | ICE: ${iceConnectionState} | 収集: ${iceGatheringState}`;
-    
-    // タイマー要素に接続方法の情報を表示
     if (connectionState === 'connected') {
-        // 接続成功時に使用された候補を調査
-        peerConnection.getStats().then(stats => {
-            let connectionType = '';
-            stats.forEach(report => {
-                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                    const localCandidate = stats.get(report.localCandidateId);
-                    const remoteCandidate = stats.get(report.remoteCandidateId);
-                    
-                    if (localCandidate && remoteCandidate) {
-                        const localType = localCandidate.candidateType;
-                        const remoteType = remoteCandidate.candidateType;
-                        connectionType = `${localType} ↔ ${remoteType}`;
-                        
-                        elements.timer.textContent = `接続方法: ${connectionType}`;
-                        console.log('接続方法:', connectionType);
-                        console.log('ローカル:', localCandidate);
-                        console.log('リモート:', remoteCandidate);
-                    }
-                }
-            });
-        }).catch(err => console.log('Stats取得エラー:', err));
+        const connectionType = await getConnectionType();
+        
+        if (connectionType) {
+            elements.timer.textContent = `接続方法: ${connectionType}`;
+            if (shouldUpdateStatus) {
+                updateStatus(`接続完了 (${connectionType})`);
+            }
+        } else {
+            if (shouldUpdateStatus) {
+                updateStatus('接続完了');
+            }
+        }
     } else {
+        // 詳細な接続情報を表示
+        const info = `接続: ${connectionState} | ICE: ${iceConnectionState} | 収集: ${iceGatheringState}`;
         elements.timer.textContent = info;
     }
 }
