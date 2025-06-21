@@ -4,8 +4,22 @@ const STUN_SERVERS = [
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // 追加のSTUNサーバー
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.voipbuster.com:3478' },
+    { urls: 'stun:stun.voipstunt.com:3478' }
 ];
+
+// セッショントークン生成
+function generateSessionToken() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 16; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+}
 
 // XOR暗号化用の関数
 function xorEncrypt(text, key) {
@@ -44,6 +58,7 @@ let currentKeyword = null;
 let activePollingIntervals = [];
 let connectionEstablished = false;
 let isWaitingForGuest = false;
+let sessionToken = null;
 
 const elements = {
     keyword: document.getElementById('keyword'),
@@ -183,7 +198,7 @@ async function sendSignal(keyword, data) {
     const encrypted = xorEncrypt(json, keyword);
     
     const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'text/plain' },
         body: encrypted
     });
@@ -216,7 +231,12 @@ async function receiveSignal(keyword) {
 }
 
 async function createPeerConnection() {
-    peerConnection = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+    peerConnection = new RTCPeerConnection({ 
+        iceServers: STUN_SERVERS,
+        iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
+        bundlePolicy: 'max-bundle', // メディアバンドル最大化
+        rtcpMuxPolicy: 'require' // RTCP多重化
+    });
     
     console.log('ローカルストリーム追加開始');
     localStream.getTracks().forEach(track => {
@@ -235,12 +255,34 @@ async function createPeerConnection() {
         playVideoSafely(elements.remoteVideo, 'リモート');
     };
     
+    let iceGatheringTimeout = null;
     peerConnection.onicecandidate = async (event) => {
         if (event.candidate) {
-            console.log('ICE候補収集:', event.candidate.type);
+            console.log('ICE候補収集:', event.candidate.type, event.candidate.address);
             iceCandidates.push(event.candidate);
+            
+            // タイムアウトをリセット
+            if (iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
+            
+            // 3秒待ってから送信（より多くの候補を収集）
+            iceGatheringTimeout = setTimeout(async () => {
+                console.log('ICE候補収集タイムアウト. 候補数:', iceCandidates.length);
+                if (iceCandidates.length > 0) {
+                    const keyword = elements.keyword.value;
+                    const iceKey = sessionToken ? 
+                        `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
+                        `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+                    console.log('ICE候補送信:', iceKey);
+                    await sendSignal(iceKey, {
+                        type: 'ice-batch',
+                        candidates: iceCandidates,
+                        isHost: isHost
+                    });
+                }
+            }, 3000);
         } else {
             // ICE候補収集完了
+            if (iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
             console.log('ICE候補収集完了. 候補数:', iceCandidates.length);
             if (iceCandidates.length > 0) {
                 const keyword = elements.keyword.value;
@@ -349,13 +391,22 @@ async function hostSession() {
     await createPeerConnection();
     setupDataChannel();
     
-    const offer = await peerConnection.createOffer();
+    // オファー作成時のオプションを追加
+    const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        iceRestart: false
+    });
     await peerConnection.setLocalDescription(offer);
     
-    console.log('オファーを送信中:', keyword);
+    // セッショントークンを生成
+    sessionToken = generateSessionToken();
+    
+    console.log('オファーを送信中:', keyword, 'トークン:', sessionToken);
     await sendSignal(keyword, {
         type: 'offer',
-        offer: offer
+        offer: offer,
+        token: sessionToken
     });
     console.log('オファー送信完了');
     
@@ -377,6 +428,7 @@ async function restartHostSession() {
     iceCandidates = [];
     connectionEstablished = false;
     isWaitingForGuest = false;
+    sessionToken = generateSessionToken();
     
     // 新しいセッションを開始
     await createPeerConnection();
@@ -431,7 +483,12 @@ async function pollForAnswer() {
         }
         
         try {
-            const signal = await receiveSignal(`${keyword}-answer`);
+            // トークンベースのパスと旧形式の両方をチェック
+            const answerPath = sessionToken ? 
+                `${keyword}/${sessionToken}/answer` : 
+                `${keyword}-answer`;
+            
+            const signal = await receiveSignal(answerPath);
             if (signal && signal.type === 'answer') {
                 clearInterval(pollInterval);
                 await peerConnection.setRemoteDescription(signal.answer);
@@ -472,6 +529,12 @@ async function startJoinPolling() {
                 clearInterval(pollInterval);
                 updateStatus('オファー受信 - 接続中...');
                 
+                // ホストからのトークンを保存
+                if (signal.token) {
+                    sessionToken = signal.token;
+                    console.log('セッショントークン受信:', sessionToken);
+                }
+                
                 await createPeerConnection();
                 setupDataChannel();
                 
@@ -479,7 +542,12 @@ async function startJoinPolling() {
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 
-                await sendSignal(`${keyword}-answer`, {
+                // トークンを使用した安全なパスで応答
+                const answerPath = sessionToken ? 
+                    `${keyword}/${sessionToken}/answer` : 
+                    `${keyword}-answer`;
+                
+                await sendSignal(answerPath, {
                     type: 'answer',
                     answer: answer
                 });
@@ -496,7 +564,9 @@ async function startJoinPolling() {
 
 async function pollForIceCandidates() {
     const keyword = elements.keyword.value;
-    const targetKey = `${keyword}-ice-${isHost ? 'guest' : 'host'}`;
+    const targetKey = sessionToken ? 
+        `${keyword}/${sessionToken}/ice-${isHost ? 'guest' : 'host'}` :
+        `${keyword}-ice-${isHost ? 'guest' : 'host'}`;
     console.log('ICE候補ポーリング開始:', targetKey);
     
     let attempts = 0;
@@ -517,7 +587,11 @@ async function pollForIceCandidates() {
                 clearInterval(pollInterval);
                 for (const candidate of signal.candidates) {
                     console.log('ICE候補追加:', candidate.type);
-                    await peerConnection.addIceCandidate(candidate);
+                    try {
+                        await peerConnection.addIceCandidate(candidate);
+                    } catch (error) {
+                        console.log('ICE候補追加エラー:', error.message);
+                    }
                 }
                 console.log('ICE候補追加完了');
             }
@@ -627,6 +701,7 @@ function cleanup() {
     currentKeyword = null;
     connectionEstablished = false;
     isWaitingForGuest = false;
+    sessionToken = null;
     clearKeywordTimer();
     clearReconnectInterval();
     
