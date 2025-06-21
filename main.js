@@ -61,6 +61,48 @@ const elements = {
 
 const ctx = elements.canvas.getContext('2d');
 
+async function playVideoSafely(videoElement, label) {
+    return new Promise((resolve) => {
+        const attemptPlay = () => {
+            const playPromise = videoElement.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log(`${label}ビデオ再生開始`);
+                    resolve();
+                }).catch(error => {
+                    console.log(`${label}ビデオ再生エラー:`, error.message);
+                    // 自動再生が拒否された場合は静かに失敗
+                    resolve();
+                });
+            } else {
+                console.log(`${label}ビデオ: play() Promise未対応`);
+                resolve();
+            }
+        };
+        
+        // ビデオが読み込まれるまで待機
+        if (videoElement.readyState >= 2) {
+            // 既に読み込み済み
+            attemptPlay();
+        } else {
+            // loadeddataイベントを待つ
+            const onLoadedData = () => {
+                videoElement.removeEventListener('loadeddata', onLoadedData);
+                attemptPlay();
+            };
+            videoElement.addEventListener('loadeddata', onLoadedData);
+            
+            // タイムアウト処理（5秒後）
+            setTimeout(() => {
+                videoElement.removeEventListener('loadeddata', onLoadedData);
+                console.log(`${label}ビデオ読み込みタイムアウト`);
+                resolve();
+            }, 5000);
+        }
+    });
+}
+
 async function startCamera() {
     try {
         // スマホ対応のため制約を緩和
@@ -74,8 +116,8 @@ async function startCamera() {
         });
         elements.localVideo.srcObject = localStream;
         
-        // ローカルビデオの再生を明示的に開始
-        elements.localVideo.play().catch(e => console.log('ローカル動画再生エラー:', e));
+        // ローカルビデオの適切な再生処理
+        await playVideoSafely(elements.localVideo, 'ローカル');
         
         return true;
     } catch (error) {
@@ -189,8 +231,8 @@ async function createPeerConnection() {
         elements.remoteVideo.onloadedmetadata = () => {
             console.log('リモートビデオサイズ:', elements.remoteVideo.videoWidth, 'x', elements.remoteVideo.videoHeight);
         };
-        // リモートビデオの再生を明示的に開始
-        elements.remoteVideo.play().catch(e => console.log('リモート動画再生エラー:', e));
+        // リモートビデオの適切な再生処理
+        playVideoSafely(elements.remoteVideo, 'リモート');
     };
     
     peerConnection.onicecandidate = async (event) => {
@@ -602,8 +644,23 @@ function toggleButtons(enabled) {
     elements.keyword.disabled = !enabled;
 }
 
-elements.hostBtn.addEventListener('click', hostSession);
-elements.joinBtn.addEventListener('click', joinSession);
+// ユーザー操作によるビデオ再生を許可
+function enableAutoplayAfterUserGesture() {
+    // すべてのビデオ要素で自動再生を試行
+    playVideoSafely(elements.localVideo, 'ローカル（ユーザー操作後）');
+    playVideoSafely(elements.remoteVideo, 'リモート（ユーザー操作後）');
+}
+
+elements.hostBtn.addEventListener('click', () => {
+    enableAutoplayAfterUserGesture();
+    hostSession();
+});
+
+elements.joinBtn.addEventListener('click', () => {
+    enableAutoplayAfterUserGesture();
+    joinSession();
+});
+
 elements.leaveBtn.addEventListener('click', leaveSession);
 
 startAAConversion();
