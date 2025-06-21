@@ -1,0 +1,218 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #1a1a1a;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #00ff00;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+h3 {
+    color: #00ff00;
+    margin: 10px 0;
+}
+
+.controls {
+    text-align: center;
+    margin: 20px 0;
+}
+
+#keyword {
+    padding: 10px;
+    font-size: 16px;
+    background-color: #2a2a2a;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    margin-right: 10px;
+    font-family: inherit;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #2a2a2a;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    cursor: pointer;
+    margin: 0 5px;
+    font-family: inherit;
+    transition: all 0.3s;
+}
+
+button:hover {
+    background-color: #00ff00;
+    color: #1a1a1a;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.status {
+    text-align: center;
+    margin: 20px 0;
+    font-size: 14px;
+}
+
+#statusText {
+    margin-right: 20px;
+}
+
+#timer {
+    color: #ffff00;
+}
+
+.chat-area {
+    display: flex;
+    justify-content: space-around;
+    gap: 40px;
+    margin-top: 30px;
+}
+
+.video-container {
+    flex: 1;
+    text-align: center;
+}
+
+.aa-display {
+    background-color: #0a0a0a;
+    border: 1px solid #00ff00;
+    padding: 10px;
+    font-size: 10px;
+    line-height: 1.2;
+    letter-spacing: 2px;
+    color: #00ff00;
+    white-space: pre;
+    overflow: hidden;
+    min-height: 400px;
+    font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    
+    .container {
+        padding: 2px 0;
+        max-width: 100%;
+        margin: 0;
+    }
+    
+    h1 {
+        font-size: 1em;
+        margin: 5px 0;
+    }
+    
+    .controls {
+        margin: 3px 0;
+        padding: 0 5px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        gap: 3px;
+    }
+    
+    #keyword {
+        padding: 3px;
+        font-size: 12px;
+        flex: 1;
+        min-width: 0;
+        max-width: 150px;
+    }
+    
+    button {
+        padding: 3px 6px;
+        font-size: 12px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+    
+    .status {
+        margin: 3px 0;
+        font-size: 10px;
+        padding: 0 5px;
+        text-align: center;
+    }
+    
+    .chat-area {
+        position: relative;
+        flex-direction: column;
+        gap: 0;
+        margin: 5px 0 0 0;
+        padding: 0;
+        height: calc(100vh - 100px);
+    }
+    
+    /* 相手（全画面表示） */
+    .video-container:nth-child(1) {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .video-container:nth-child(1) h3 {
+        font-size: 0.9em;
+        margin: 3px 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 10;
+        background: rgba(0,0,0,0.7);
+        padding: 2px 5px;
+    }
+    
+    .video-container:nth-child(1) .aa-display {
+        font-size: 8px;
+        letter-spacing: 0.5px;
+        height: 100%;
+        min-height: unset;
+        max-height: unset;
+        overflow: hidden;
+        line-height: 1.2;
+    }
+    
+    /* 自分（右下オーバーラップ） */
+    .video-container:nth-child(2) {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 160px;
+        z-index: 20;
+    }
+    
+    .video-container:nth-child(2) h3 {
+        font-size: 0.6em;
+        margin: 1px 0;
+        background: rgba(0,0,0,0.8);
+        padding: 1px 3px;
+        text-align: center;
+    }
+    
+    .video-container:nth-child(2) .aa-display {
+        font-size: 2px;
+        letter-spacing: 0.1px;
+        height: 120px;
+        min-height: unset;
+        max-height: unset;
+        overflow: hidden;
+        line-height: 1.0;
+        border: 1px solid #00ff00;
+        white-space: pre;
+        word-break: keep-all;
+    }
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAビデオチャット</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>AAビデオチャット</h1>
+        
+        <div class="controls">
+            <input type="text" id="keyword" placeholder="キーワードを入力">
+            <button id="hostBtn">ホストする</button>
+            <button id="joinBtn">参加する</button>
+            <button id="leaveBtn" style="display: none;">退室</button>
+        </div>
+        
+        <div class="status">
+            <span id="statusText">未接続</span>
+            <span id="timer"></span>
+        </div>
+        
+        <div class="chat-area">
+            <div class="video-container">
+                <h3>相手</h3>
+                <pre id="remoteAA" class="aa-display"></pre>
+                <video id="remoteVideo" autoplay style="display: none;"></video>
+            </div>
+            
+            <div class="video-container">
+                <h3>自分</h3>
+                <pre id="localAA" class="aa-display"></pre>
+                <video id="localVideo" autoplay muted style="display: none;"></video>
+            </div>
+        </div>
+        
+        <canvas id="canvas" style="display: none;"></canvas>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
