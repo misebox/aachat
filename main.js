@@ -41,6 +41,9 @@ let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let reconnectInterval = null;
 let currentKeyword = null;
+let activePollingIntervals = [];
+let connectionEstablished = false;
+let isWaitingForGuest = false;
 
 const elements = {
     keyword: document.getElementById('keyword'),
@@ -122,35 +125,52 @@ function startAAConversion() {
     }, 100);
 }
 
+function stopAllPolling() {
+    activePollingIntervals.forEach(intervalId => clearInterval(intervalId));
+    activePollingIntervals = [];
+    console.log('全ポーリング停止');
+}
+
+function addPollingInterval(intervalId) {
+    activePollingIntervals.push(intervalId);
+}
+
 async function sendSignal(keyword, data) {
+    console.log('送信中:', keyword, 'データタイプ:', data.type);
     const json = JSON.stringify(data);
     const encrypted = xorEncrypt(json, keyword);
     
-    const response = await fetch(`${PPNG_SERVER}/${keyword}`, {
+    const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: encrypted
     });
     
     if (!response.ok) {
+        console.error('送信エラー:', response.status, response.statusText);
         throw new Error('シグナル送信エラー');
     }
+    console.log('送信成功:', keyword);
 }
 
 async function receiveSignal(keyword) {
-    const response = await fetch(`${PPNG_SERVER}/${keyword}`);
+    console.log('受信試行:', keyword);
+    const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`);
     
     if (!response.ok) {
         if (response.status === 400) {
-            // データがまだ送信されていない
+            console.log('受信結果: データなし (400)');
             return null;
         }
+        console.error('受信エラー:', response.status, response.statusText);
         throw new Error('シグナル受信エラー');
     }
     
     const encrypted = await response.text();
     const decrypted = xorDecrypt(encrypted, keyword);
-    return JSON.parse(decrypted);
+    const data = JSON.parse(decrypted);
+    console.log('受信成功:', keyword, 'データタイプ:', data.type);
+    return data;
 }
 
 async function createPeerConnection() {
@@ -200,13 +220,29 @@ async function createPeerConnection() {
         if (peerConnection.connectionState === 'connected') {
             updateStatus('接続完了');
             sessionActive = true;
-            reconnectAttempts = 0; // 成功時にリセット
+            connectionEstablished = true;
+            isWaitingForGuest = false;
+            reconnectAttempts = 0;
             clearKeywordTimer();
+            stopAllPolling(); // 接続完了時にポーリング停止
         } else if (peerConnection.connectionState === 'disconnected' || 
                    peerConnection.connectionState === 'failed') {
-            if (sessionActive) {
-                // セッション中の切断の場合は再接続を試行
-                attemptReconnect();
+            if (connectionEstablished) {
+                // 一度接続した後の切断の場合
+                connectionEstablished = false;
+                sessionActive = false;
+                
+                if (isHost) {
+                    // ホストは最初からやり直し
+                    updateStatus('参加者が退室しました。新しいセッションを開始中...');
+                    setTimeout(() => {
+                        restartHostSession();
+                    }, 1000);
+                } else {
+                    // ゲストは接続失敗として処理
+                    updateStatus('接続が切断されました');
+                    cleanup();
+                }
             } else {
                 handleDisconnect();
             }
@@ -260,7 +296,7 @@ async function hostSession() {
         return;
     }
     
-    currentKeyword = keyword; // 再接続用に保存
+    currentKeyword = keyword;
     
     if (!await startCamera()) return;
     
@@ -274,14 +310,47 @@ async function hostSession() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     
+    console.log('オファーを送信中:', keyword);
     await sendSignal(keyword, {
         type: 'offer',
         offer: offer
     });
+    console.log('オファー送信完了');
     
     updateStatus('参加者を待っています...');
     startKeywordTimer();
     
+    pollForAnswer();
+}
+
+async function restartHostSession() {
+    console.log('ホストセッション再開');
+    
+    // 既存の接続をクリーンアップ
+    stopAllPolling();
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    iceCandidates = [];
+    connectionEstablished = false;
+    isWaitingForGuest = false;
+    
+    // 新しいセッションを開始
+    await createPeerConnection();
+    setupDataChannel();
+    
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    
+    console.log('新しいオファーを送信中:', currentKeyword);
+    await sendSignal(currentKeyword, {
+        type: 'offer',
+        offer: offer
+    });
+    console.log('新しいオファー送信完了');
+    
+    updateStatus('新しい参加者を待っています...');
     pollForAnswer();
 }
 
@@ -292,7 +361,7 @@ async function joinSession() {
         return;
     }
     
-    currentKeyword = keyword; // 再接続用に保存
+    currentKeyword = keyword;
     
     if (!await startCamera()) return;
     
@@ -300,37 +369,25 @@ async function joinSession() {
     updateStatus('接続中...');
     toggleButtons(false);
     
-    try {
-        const signal = await receiveSignal(keyword);
-        
-        if (!signal || signal.type !== 'offer') {
-            throw new Error('有効なセッションが見つかりません');
-        }
-        
-        await createPeerConnection();
-        setupDataChannel();
-        
-        await peerConnection.setRemoteDescription(signal.offer);
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        
-        await sendSignal(`${keyword}-answer`, {
-            type: 'answer',
-            answer: answer
-        });
-        
-        pollForIceCandidates();
-        
-    } catch (error) {
-        console.error('参加エラー:', error);
-        updateStatus('接続に失敗しました');
-        cleanup();
-    }
+    // シンプルにポーリングで検索
+    startJoinPolling();
 }
 
 async function pollForAnswer() {
     const keyword = elements.keyword.value;
+    let attempts = 0;
+    const maxAttempts = 30;
+    
     const pollInterval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts || connectionEstablished) {
+            clearInterval(pollInterval);
+            if (!connectionEstablished) {
+                updateStatus('タイムアウト: 参加者が見つかりませんでした');
+            }
+            return;
+        }
+        
         try {
             const signal = await receiveSignal(`${keyword}-answer`);
             if (signal && signal.type === 'answer') {
@@ -341,9 +398,58 @@ async function pollForAnswer() {
         } catch (error) {
             // 応答待ち
         }
-    }, 1000);
+    }, 2000);
     
-    setTimeout(() => clearInterval(pollInterval), 60000);
+    addPollingInterval(pollInterval);
+}
+
+async function startJoinPolling() {
+    const keyword = currentKeyword;
+    let attempts = 0;
+    const maxAttempts = 30;
+    
+    updateStatus('オファーを検索しています...');
+    
+    const pollInterval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts || connectionEstablished) {
+            clearInterval(pollInterval);
+            if (!connectionEstablished) {
+                updateStatus('タイムアウト: セッションが見つかりませんでした');
+                cleanup();
+            }
+            return;
+        }
+        
+        try {
+            // シンプルに基本キーワードのみを検索
+            console.log('オファーを検索中:', keyword);
+            const signal = await receiveSignal(keyword);
+            
+            if (signal && signal.type === 'offer') {
+                clearInterval(pollInterval);
+                updateStatus('オファー受信 - 接続中...');
+                
+                await createPeerConnection();
+                setupDataChannel();
+                
+                await peerConnection.setRemoteDescription(signal.offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                await sendSignal(`${keyword}-answer`, {
+                    type: 'answer',
+                    answer: answer
+                });
+                
+                pollForIceCandidates();
+            }
+        } catch (error) {
+            console.log('参加ポーリングエラー:', error.message);
+        }
+    }, 2000);
+    
+    addPollingInterval(pollInterval);
 }
 
 async function pollForIceCandidates() {
@@ -351,7 +457,17 @@ async function pollForIceCandidates() {
     const targetKey = `${keyword}-ice-${isHost ? 'guest' : 'host'}`;
     console.log('ICE候補ポーリング開始:', targetKey);
     
+    let attempts = 0;
+    const maxAttempts = 10;
+    
     const pollInterval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts || connectionEstablished) {
+            console.log('ICE候補ポーリング終了');
+            clearInterval(pollInterval);
+            return;
+        }
+        
         try {
             const signal = await receiveSignal(targetKey);
             if (signal && signal.type === 'ice-batch' && signal.isHost !== isHost) {
@@ -366,12 +482,9 @@ async function pollForIceCandidates() {
         } catch (error) {
             console.log('ICE候補受信エラー:', error.message);
         }
-    }, 1000);
+    }, 2000);
     
-    setTimeout(() => {
-        console.log('ICE候補ポーリングタイムアウト');
-        clearInterval(pollInterval);
-    }, 30000);
+    addPollingInterval(pollInterval);
 }
 
 function startKeywordTimer() {
@@ -417,90 +530,7 @@ function clearKeywordTimer() {
     elements.timer.textContent = '';
 }
 
-async function attemptReconnect() {
-    if (reconnectAttempts >= maxReconnectAttempts) {
-        updateStatus('再接続回数上限に達しました');
-        handleDisconnect();
-        return;
-    }
-    
-    reconnectAttempts++;
-    updateStatus(`再接続中... (${reconnectAttempts}/${maxReconnectAttempts})`);
-    
-    // 既存の接続をクリーンアップ
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    
-    // 少し待ってから再接続
-    setTimeout(async () => {
-        try {
-            iceCandidates = [];
-            
-            if (isHost) {
-                await createPeerConnection();
-                setupDataChannel();
-                
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                
-                await sendSignal(`${currentKeyword}-reconnect-${Date.now()}`, {
-                    type: 'offer',
-                    offer: offer
-                });
-                
-                pollForAnswer();
-            } else {
-                // ゲストは新しいオファーを待つ
-                pollForReconnectOffer();
-            }
-        } catch (error) {
-            console.error('再接続エラー:', error);
-            setTimeout(() => attemptReconnect(), 2000);
-        }
-    }, 2000);
-}
 
-async function pollForReconnectOffer() {
-    const pollInterval = setInterval(async () => {
-        try {
-            // 再接続用のオファーをポーリング
-            const signals = await Promise.all([
-                receiveSignal(`${currentKeyword}-reconnect-${Date.now()}`).catch(() => null),
-                receiveSignal(`${currentKeyword}-reconnect-${Date.now() - 1000}`).catch(() => null),
-                receiveSignal(`${currentKeyword}-reconnect-${Date.now() - 2000}`).catch(() => null)
-            ]);
-            
-            const signal = signals.find(s => s && s.type === 'offer');
-            
-            if (signal) {
-                clearInterval(pollInterval);
-                
-                await createPeerConnection();
-                setupDataChannel();
-                
-                await peerConnection.setRemoteDescription(signal.offer);
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                await sendSignal(`${currentKeyword}-answer`, {
-                    type: 'answer',
-                    answer: answer
-                });
-                
-                pollForIceCandidates();
-            }
-        } catch (error) {
-            // 再接続オファー待ち
-        }
-    }, 1000);
-    
-    setTimeout(() => {
-        clearInterval(pollInterval);
-        setTimeout(() => attemptReconnect(), 1000);
-    }, 5000);
-}
 
 function handleDisconnect() {
     clearReconnectInterval();
@@ -525,6 +555,8 @@ function leaveSession() {
 }
 
 function cleanup() {
+    stopAllPolling(); // 全ポーリング停止
+    
     if (dataChannel) {
         dataChannel.close();
         dataChannel = null;
@@ -551,6 +583,8 @@ function cleanup() {
     iceCandidates = [];
     reconnectAttempts = 0;
     currentKeyword = null;
+    connectionEstablished = false;
+    isWaitingForGuest = false;
     clearKeywordTimer();
     clearReconnectInterval();
     
