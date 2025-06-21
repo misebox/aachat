@@ -21,6 +21,12 @@ function generateSessionToken() {
     return token;
 }
 
+function generateSuggestedKeyword(baseKeyword) {
+    const suffixes = ['2', '3', 'b', 'alt', 'new', 'x'];
+    const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+    return baseKeyword + randomSuffix;
+}
+
 // XOR暗号化用の関数
 function xorEncrypt(text, key) {
     const encrypted = [];
@@ -286,7 +292,9 @@ async function createPeerConnection() {
             console.log('ICE候補収集完了. 候補数:', iceCandidates.length);
             if (iceCandidates.length > 0) {
                 const keyword = elements.keyword.value;
-                const iceKey = `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+                const iceKey = sessionToken ? 
+                    `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
+                    `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
                 console.log('ICE候補送信:', iceKey);
                 await sendSignal(iceKey, {
                     type: 'ice-batch',
@@ -309,6 +317,7 @@ async function createPeerConnection() {
             reconnectAttempts = 0;
             clearKeywordTimer();
             stopAllPolling(); // 接続完了時にポーリング停止
+            updateConnectionInfo(); // 接続方法を表示
         } else if (peerConnection.connectionState === 'disconnected' || 
                    peerConnection.connectionState === 'failed') {
             if (connectionEstablished) {
@@ -336,11 +345,13 @@ async function createPeerConnection() {
     // ICE接続状態の監視
     peerConnection.oniceconnectionstatechange = () => {
         console.log('ICE接続状態:', peerConnection.iceConnectionState);
+        updateConnectionInfo();
     };
     
     // ICE収集状態の監視
     peerConnection.onicegatheringstatechange = () => {
         console.log('ICE収集状態:', peerConnection.iceGatheringState);
+        updateConnectionInfo();
     };
 }
 
@@ -403,12 +414,55 @@ async function hostSession() {
     sessionToken = generateSessionToken();
     
     console.log('オファーを送信中:', keyword, 'トークン:', sessionToken);
-    await sendSignal(keyword, {
-        type: 'offer',
-        offer: offer,
-        token: sessionToken
-    });
-    console.log('オファー送信完了');
+    try {
+        await sendSignal(keyword, {
+            type: 'offer',
+            offer: offer,
+            token: sessionToken
+        });
+        console.log('オファー送信完了');
+    } catch (error) {
+        // 400エラーをチェック（既存ホストの検出）
+        if (error.message.includes('シグナル送信エラー')) {
+            try {
+                const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({type: 'offer', offer: offer, token: sessionToken})
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    if (errorText.includes('Another sender has been connected')) {
+                        // 既存ホストが存在
+                        const suggestedKeyword = generateSuggestedKeyword(keyword);
+                        updateStatus('エラー: このキーワードは既に使用されています');
+                        
+                        const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
+                                      `以下のような別のキーワードを試してください：\n` +
+                                      `• ${suggestedKeyword}\n` +
+                                      `• ${keyword}-room\n` +
+                                      `• ${keyword}${Math.floor(Math.random() * 100)}\n\n` +
+                                      `または、そのセッションに「参加する」ボタンで参加することもできます。`;
+                        
+                        alert(message);
+                        
+                        // 提案されたキーワードを入力フィールドに設定
+                        elements.keyword.value = suggestedKeyword;
+                        cleanup();
+                        return;
+                    }
+                }
+            } catch (checkError) {
+                console.log('既存ホスト確認エラー:', checkError.message);
+            }
+        }
+        
+        // その他のエラーの場合は表示して終了
+        updateStatus('接続エラー: ' + error.message);
+        cleanup();
+        return;
+    }
     
     updateStatus('参加者を待っています...');
     startKeywordTimer();
@@ -437,10 +491,12 @@ async function restartHostSession() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     
-    console.log('新しいオファーを送信中:', currentKeyword);
+    // 新しいトークンでオファーを送信
+    console.log('新しいオファーを送信中:', currentKeyword, 'トークン:', sessionToken);
     await sendSignal(currentKeyword, {
         type: 'offer',
-        offer: offer
+        offer: offer,
+        token: sessionToken
     });
     console.log('新しいオファー送信完了');
     
@@ -710,6 +766,44 @@ function cleanup() {
 
 function updateStatus(text) {
     elements.statusText.textContent = text;
+}
+
+function updateConnectionInfo() {
+    if (!peerConnection) return;
+    
+    const connectionState = peerConnection.connectionState;
+    const iceConnectionState = peerConnection.iceConnectionState;
+    const iceGatheringState = peerConnection.iceGatheringState;
+    
+    // 詳細な接続情報を表示
+    const info = `接続: ${connectionState} | ICE: ${iceConnectionState} | 収集: ${iceGatheringState}`;
+    
+    // タイマー要素に接続方法の情報を表示
+    if (connectionState === 'connected') {
+        // 接続成功時に使用された候補を調査
+        peerConnection.getStats().then(stats => {
+            let connectionType = '';
+            stats.forEach(report => {
+                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                    const localCandidate = stats.get(report.localCandidateId);
+                    const remoteCandidate = stats.get(report.remoteCandidateId);
+                    
+                    if (localCandidate && remoteCandidate) {
+                        const localType = localCandidate.candidateType;
+                        const remoteType = remoteCandidate.candidateType;
+                        connectionType = `${localType} ↔ ${remoteType}`;
+                        
+                        elements.timer.textContent = `接続方法: ${connectionType}`;
+                        console.log('接続方法:', connectionType);
+                        console.log('ローカル:', localCandidate);
+                        console.log('リモート:', remoteCandidate);
+                    }
+                }
+            });
+        }).catch(err => console.log('Stats取得エラー:', err));
+    } else {
+        elements.timer.textContent = info;
+    }
 }
 
 function toggleButtons(enabled) {
