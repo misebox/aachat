@@ -548,6 +548,7 @@ async function pollForAnswer() {
             const signal = await receiveSignal(answerPath);
             if (signal && signal.type === 'answer') {
                 clearInterval(pollInterval);
+                updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
                 await peerConnection.setRemoteDescription(signal.answer);
                 pollForIceCandidates();
             }
@@ -584,7 +585,7 @@ async function startJoinPolling() {
             
             if (signal && signal.type === 'offer') {
                 clearInterval(pollInterval);
-                updateStatus('オファー受信 - 接続中...');
+                updateStatus('オファー受信 - 応答を準備中...');
                 
                 // ホストからのトークンを保存
                 if (signal.token) {
@@ -596,6 +597,7 @@ async function startJoinPolling() {
                 setupDataChannel();
                 
                 await peerConnection.setRemoteDescription(signal.offer);
+                updateStatus('応答を作成中...');
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 
@@ -604,11 +606,13 @@ async function startJoinPolling() {
                     `${keyword}/${sessionToken}/answer` : 
                     `${keyword}-answer`;
                 
+                updateStatus('応答を送信中...');
                 await sendSignal(answerPath, {
                     type: 'answer',
                     answer: answer
                 });
                 
+                updateStatus('ICE候補を交換中...');
                 pollForIceCandidates();
             }
         } catch (error) {
@@ -642,6 +646,7 @@ async function pollForIceCandidates() {
             if (signal && signal.type === 'ice-batch' && signal.isHost !== isHost) {
                 console.log('ICE候補受信:', signal.candidates.length, '個');
                 clearInterval(pollInterval);
+                updateStatus('ICE候補を受信 - 接続を確立中...');
                 for (const candidate of signal.candidates) {
                     console.log('ICE候補追加:', candidate.type);
                     try {
@@ -651,6 +656,7 @@ async function pollForIceCandidates() {
                     }
                 }
                 console.log('ICE候補追加完了');
+                updateStatus('接続を確立中...');
             }
         } catch (error) {
             console.log('ICE候補受信エラー:', error.message);
@@ -811,7 +817,6 @@ async function updateConnectionInfo(shouldUpdateStatus = false) {
         const connectionType = await getConnectionType();
         
         if (connectionType) {
-            elements.timer.textContent = `接続方法: ${connectionType}`;
             if (shouldUpdateStatus) {
                 updateStatus(`接続完了 (${connectionType})`);
             }
