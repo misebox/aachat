@@ -1,39 +1,40 @@
 body {
     margin: 0;
     padding: 0;
-    background-color: #1a1a1a;
+    background-color: #000000;
     color: #ffffff;
     font-family: 'Courier New', monospace;
     overflow-x: hidden;
 }
 
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+    max-width: 100%;
+    margin: 0;
+    padding: 10px 5px;
 }
 
 h1 {
     text-align: center;
     color: #ffffff;
     text-shadow: 0 0 10px #ffffff;
+    margin: 5px 0;
 }
 
 h3 {
     color: #ffffff;
-    margin: 10px 0;
+    margin: 5px 0;
 }
 
 .controls {
     text-align: center;
-    margin: 20px 0;
+    margin: 10px 0;
 }
 
 #keyword {
     padding: 10px;
     font-size: 16px;
-    background-color: #2a2a2a;
-    border: 1px solid #ffffff;
+    background-color: transparent;
+    border: 1px solid #666666;
     color: #ffffff;
     margin-right: 5px;
     font-family: inherit;
@@ -46,8 +47,8 @@ h3 {
 button {
     padding: 10px 20px;
     font-size: 16px;
-    background-color: #2a2a2a;
-    border: 1px solid #ffffff;
+    background-color: transparent;
+    border: 1px solid #666666;
     color: #ffffff;
     cursor: pointer;
     margin: 0 5px;
@@ -56,8 +57,8 @@ button {
 }
 
 button:hover {
-    background-color: #ffffff;
-    color: #1a1a1a;
+    background-color: #333333;
+    border-color: #ffffff;
 }
 
 button:disabled {
@@ -67,7 +68,7 @@ button:disabled {
 
 .status {
     text-align: center;
-    margin: 20px 0;
+    margin: 5px 0;
     font-size: 14px;
 }
 
@@ -81,30 +82,51 @@ button:disabled {
 
 .chat-area {
     display: flex;
-    justify-content: space-around;
-    gap: 40px;
-    margin-top: 30px;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin: 5px;
+    height: calc(100vh - 100px);
+    flex-direction: row;
+}
+
+/* Vertical layout for narrow screens */
+@media (max-width: 1200px) and (min-width: 769px) {
+    .chat-area {
+        flex-direction: column;
+        gap: 20px;
+    }
 }
 
 .video-container {
-    flex: 1;
+    flex: 0 1 auto;
     text-align: center;
+    position: relative;
+}
+
+.video-container h3 {
+    margin-bottom: 5px;
+    font-size: 1.0em;
+    color: #ffffff;
+    font-weight: normal;
 }
 
 .aa-display {
-    background-color: #0a0a0a;
-    border: 1px solid #ffffff;
-    padding: 10px;
+    background-color: #000000;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    padding: 0;
+    margin: 0;
     font-size: var(--aa-font-size, 10px);
     line-height: 1.0;
-    letter-spacing: calc(var(--aa-font-size, 10px) * 0.67);
+    letter-spacing: calc(var(--aa-font-size, 10px) * 0.4);
     color: #ffffff;
     white-space: pre;
     overflow: hidden;
     font-family: 'Courier New', monospace;
-    width: 100%;
-    max-width: 800px;
-    height: calc(var(--aa-font-size, 10px) * 60 + 20px);
+    width: calc(80 * var(--aa-font-size, 10px) * 0.6 + 79 * var(--aa-font-size, 10px) * 0.4);
+    height: calc(60 * var(--aa-font-size, 10px));
+    display: block;
 }
 
 @media (max-width: 768px) {
@@ -120,8 +142,8 @@ button:disabled {
     }
     
     h1 {
-        font-size: 0.8em;
-        margin: 2px 0;
+        font-size: 1.2em;
+        margin: 5px 0;
     }
     
     .controls {
@@ -135,29 +157,30 @@ button:disabled {
     }
     
     #keyword {
-        padding: 3px;
-        font-size: 12px;
+        padding: 8px;
+        font-size: 16px;
         flex: 1;
         min-width: 0;
-        max-width: 150px;
-        margin-right: 2px;
+        max-width: 200px;
+        margin-right: 5px;
     }
     
     #clearBtn {
         margin-right: 8px;
-        padding: 3px 6px;
+        padding: 8px 12px;
+        font-size: 14px;
     }
     
     button {
-        padding: 3px 6px;
-        font-size: 12px;
+        padding: 8px 12px;
+        font-size: 14px;
         margin: 0;
         flex-shrink: 0;
     }
     
     .status {
-        margin: 3px 0;
-        font-size: 10px;
+        margin: 5px 0;
+        font-size: 14px;
         padding: 0 5px;
         text-align: center;
     }
