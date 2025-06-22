@@ -45,7 +45,9 @@ function xorDecrypt(encryptedBase64, key) {
     return decrypted.join('');
 }
 
-const ASCII_CHARS = ' .`\':,^;-~+<*O#@';
+// ASCII文字セット（明度順、暗→明）
+const ASCII_CHARS = ' .`\'"-:;!l/tfjrxnvcXYUJ0ZMKG8#@$';
+const CHAR_COUNT = ASCII_CHARS.length;
 const AA_WIDTH = 80;
 const AA_HEIGHT = 60;
 
@@ -334,11 +336,11 @@ function videoToAscii(video) {
                 brightness = Math.max(0, Math.min(1, brightness)); // クリップ
                 
                 // ASCII_CHARSのインデックスに変換
-                const charIndex = Math.floor(brightness * (ASCII_CHARS.length - 1));
+                const charIndex = Math.floor(brightness * (CHAR_COUNT - 1));
                 ascii += ASCII_CHARS[charIndex];
             } else {
                 // 通常の変換
-                const charIndex = Math.floor((brightness / 255) * (ASCII_CHARS.length - 1));
+                const charIndex = Math.floor((brightness / 255) * (CHAR_COUNT - 1));
                 ascii += ASCII_CHARS[charIndex];
             }
         }

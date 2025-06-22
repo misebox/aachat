@@ -347,7 +347,7 @@ button:disabled {
     white-space: pre;
     overflow: hidden;
     font-family: 'Courier New', monospace;
-    font-weight: bold;
+    font-weight: normal;
     width: calc(80 * var(--aa-font-size, 10px) * 0.6 + 79 * var(--aa-font-size, 10px) * 0.4);
     height: calc(60 * var(--aa-font-size, 10px));
     max-width: 100%;
