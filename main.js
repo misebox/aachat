@@ -1025,6 +1025,39 @@ elements.clearBtn.addEventListener('click', () => {
     window.location.href = window.location.pathname;
 });
 
+// 文字サイズ自動調整関数
+function adjustAAFontSize() {
+    const aaDisplays = document.querySelectorAll('.aa-display');
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight;
+    
+    // モバイルの場合は1.2vwを使用
+    if (containerWidth <= 768) {
+        document.documentElement.style.setProperty('--aa-font-size', '1.2vw');
+        console.log('AA表示フォントサイズ調整: 1.2vw (モバイル)');
+        return;
+    }
+    
+    // デスクトップの場合は画面サイズに基づいて計算
+    // 80文字 + letter-spacing(0.67倍) = 80 * 1.67倍の幅が必要
+    const widthBasedSize = containerWidth / (80 * 1.67) * 0.9; // 90%に縮小
+    const heightBasedSize = containerHeight / 80 * 0.9; // 60行 + 余白で90%に
+    
+    // より小さい方を採用（画面に収まるように）
+    let fontSize = Math.min(widthBasedSize, heightBasedSize, 12); // 最大12px
+    fontSize = Math.max(fontSize, 6); // 最小6px
+    
+    // CSSカスタムプロパティで動的に設定
+    document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
+    console.log('AA表示フォントサイズ調整:', fontSize + 'px');
+}
+
+// リサイズイベントでフォントサイズ調整
+window.addEventListener('resize', () => {
+    adjustAAFontSize();
+});
+
 // ページ読み込み時に実行
 loadKeywordFromURL();
 startAAConversion();
+adjustAAFontSize();
