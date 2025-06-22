@@ -1224,6 +1224,39 @@ function adjustAAFontSize() {
         return;
     }
     
+    // タブレットの場合は画面に収まるように調整
+    if (containerWidth <= 1200) {
+        // 縦向きか横向きかを判定
+        const isPortrait = containerHeight > containerWidth;
+        
+        let availableWidth, availableHeight, fontSizeByWidth, fontSizeByHeight;
+        
+        if (isPortrait) {
+            // 縦向きタブレット：縦並びレイアウト
+            availableWidth = containerWidth - 40; // 1つのAAエリア + マージン
+            availableHeight = (containerHeight - 160) / 2; // 2つのAAエリア + コントロール
+            fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
+            fontSizeByHeight = availableHeight / 60;
+        } else {
+            // 横向きタブレット：横並びレイアウト
+            availableWidth = (containerWidth - 60) / 2; // 2つのAAエリア + マージン
+            availableHeight = containerHeight - 120; // コントロール分を除く
+            fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
+            fontSizeByHeight = availableHeight / 60;
+        }
+        
+        const tabletFontSize = Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
+        document.documentElement.style.setProperty('--aa-font-size', `${tabletFontSize}px`);
+        console.log('タブレットAAサイズ調整:', tabletFontSize + 'px', {
+            isPortrait,
+            availableWidth,
+            availableHeight,
+            fontSizeByWidth,
+            fontSizeByHeight
+        });
+        return;
+    }
+    
     // デスクトップの場合は画面サイズに基づいて計算
     let fontSize;
     
@@ -1268,8 +1301,10 @@ function adjustMobileAASize() {
     const remoteMaxHeight = baseHeight * 0.4;
     const remoteFontSize = Math.max(4, Math.min(10, remoteMaxHeight / 60, containerWidth * 0.012));
     
-    // 自分のAAサイズ（縮小可能）
-    const localFontSize = Math.max(3, Math.min(8, localAvailableHeight / 60, containerWidth * 0.01));
+    // 自分のAAサイズ（基本的に相手と同じサイズ、スペース不足時のみ縮小）
+    const idealLocalFontSize = remoteFontSize; // 相手と同じサイズを目標
+    const maxLocalFontSize = Math.min(localAvailableHeight / 60, containerWidth * 0.01);
+    const localFontSize = Math.max(3, Math.min(idealLocalFontSize, maxLocalFontSize));
     
     // 相手のAAサイズ設定
     document.documentElement.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
@@ -1280,12 +1315,12 @@ function adjustMobileAASize() {
     if (localAA) {
         localAA.style.fontSize = `${localFontSize}px`;
         localAA.style.letterSpacing = `${localFontSize * 0.4}px`;
-        localAA.style.width = `${80 * localFontSize * 0.6 + 79 * localFontSize * 0.4}px`;
+        localAA.style.width = `${80 * localFontSize * 1.0 + 79 * localFontSize * 0.4}px`;
         localAA.style.height = `${60 * localFontSize}px`;
         
         // 必要に応じてスケール調整
         const maxWidth = containerWidth - 4;
-        const calculatedWidth = 80 * localFontSize * 0.6 + 79 * localFontSize * 0.4;
+        const calculatedWidth = 80 * localFontSize * 1.0 + 79 * localFontSize * 0.4;
         const maxHeight = localAvailableHeight - 10;
         const calculatedHeight = 60 * localFontSize;
         
@@ -1310,15 +1345,23 @@ function adjustMobileAASize() {
     });
 }
 
-// リサイズイベントでフォントサイズ調整
+// リサイズイベントでフォントサイズ調整（スロットリング）
+let resizeTimeout;
 window.addEventListener('resize', () => {
-    adjustAAFontSize();
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        adjustAAFontSize();
+    }, 1000);
 });
 
 // Visual Viewport API対応（iOSキーボード表示時の対応）
+let viewportResizeTimeout;
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
-        adjustAAFontSize();
+        clearTimeout(viewportResizeTimeout);
+        viewportResizeTimeout = setTimeout(() => {
+            adjustAAFontSize();
+        }, 1000);
     });
 }
 

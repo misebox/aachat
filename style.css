@@ -237,11 +237,20 @@ button:disabled {
     flex-direction: row;
 }
 
-/* Vertical layout for narrow screens */
-@media (max-width: 1200px) and (min-width: 769px) {
+/* Tablet layout: Portrait (縦向き) */
+@media (min-width: 769px) and (max-width: 1200px) and (orientation: portrait) {
     .chat-area {
         flex-direction: column;
-        gap: 20px;
+        gap: 15px;
+        height: calc(100vh - 140px);
+        margin: 10px;
+    }
+    
+    .video-container {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        min-height: 0;
     }
     
     .video-container h3 {
@@ -256,6 +265,59 @@ button:disabled {
         text-shadow: 0 0 5px #ffffff;
         margin: 0;
         font-size: 0.9em;
+    }
+}
+
+/* Tablet layout: Landscape (横向き) */
+@media (min-width: 769px) and (max-width: 1200px) and (orientation: landscape) {
+    .chat-area {
+        flex-direction: row;
+        gap: 15px;
+        height: calc(100vh - 120px);
+        margin: 10px;
+    }
+    
+    .video-container {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        min-width: 0;
+    }
+    
+    .video-container h3 {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 3px 8px;
+        border-radius: 3px;
+        color: #ffffff;
+        text-shadow: 0 0 5px #ffffff;
+        margin: 0;
+        font-size: 0.9em;
+    }
+}
+
+/* Tablet layout controls visibility */
+@media (min-width: 769px) and (max-width: 1200px) {
+    .device-controls {
+        display: none;
+    }
+    
+    .mobile-device-btn {
+        display: none;
+    }
+    
+    .desktop-device-btn {
+        display: inline-block;
+    }
+    
+    .controls {
+        display: block;
+        text-align: center;
+        margin: 10px 0;
+        position: relative;
     }
 }
 
@@ -277,7 +339,7 @@ button:disabled {
     border: 1px solid #333333;
     border-radius: 2px;
     padding: 0;
-    margin: 0;
+    margin: 0 auto;
     font-size: var(--aa-font-size, 10px);
     line-height: 1.0;
     letter-spacing: calc(var(--aa-font-size, 10px) * 0.4);
@@ -288,7 +350,11 @@ button:disabled {
     font-weight: bold;
     width: calc(80 * var(--aa-font-size, 10px) * 0.6 + 79 * var(--aa-font-size, 10px) * 0.4);
     height: calc(60 * var(--aa-font-size, 10px));
+    max-width: 100%;
+    max-height: 100%;
     display: block;
+    box-sizing: border-box;
+    object-fit: contain;
 }
 
 @media (max-width: 768px) {
@@ -478,7 +544,7 @@ button:disabled {
         border: 1px solid #ffffff;
         white-space: pre;
         word-break: keep-all;
-        width: calc(80 * var(--aa-font-size, 4px) * 0.6 + 79 * var(--aa-font-size, 4px) * 0.4);
+        width: calc(80 * var(--aa-font-size, 4px) * 1.0 + 79 * var(--aa-font-size, 4px) * 0.4);
         height: calc(60 * var(--aa-font-size, 4px));
         margin: 0 auto;
         transform-origin: top center;
