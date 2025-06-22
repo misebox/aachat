@@ -285,6 +285,7 @@ button:disabled {
     white-space: pre;
     overflow: hidden;
     font-family: 'Courier New', monospace;
+    font-weight: bold;
     width: calc(80 * var(--aa-font-size, 10px) * 0.6 + 79 * var(--aa-font-size, 10px) * 0.4);
     height: calc(60 * var(--aa-font-size, 10px));
     display: block;
@@ -421,11 +422,12 @@ button:disabled {
         margin-bottom: 60px;
     }
     
-    /* 相手（上半分） */
+    /* 相手（固定サイズ、優先表示） */
     .video-container:nth-child(1) {
         position: relative;
         width: 100%;
-        height: calc(50% - 25px);
+        height: auto;
+        min-height: 40vh;
         flex-shrink: 0;
     }
     
@@ -444,43 +446,45 @@ button:disabled {
     }
     
     .video-container:nth-child(1) .aa-display {
-        font-size: var(--aa-font-size, 8px);
-        letter-spacing: calc(var(--aa-font-size, 8px) * 0.4);
-        height: 100%;
-        min-height: unset;
-        max-height: unset;
+        font-size: var(--remote-aa-font-size, 8px);
+        letter-spacing: calc(var(--remote-aa-font-size, 8px) * 0.4);
+        width: calc(80 * var(--remote-aa-font-size, 8px) * 0.6 + 79 * var(--remote-aa-font-size, 8px) * 0.4);
+        height: calc(60 * var(--remote-aa-font-size, 8px));
+        max-height: 40vh;
         overflow: hidden;
         line-height: 1.0;
         border: 1px solid #ffffff;
         padding: 0;
         margin: 0 auto;
-        width: auto;
         max-width: calc(100vw - 4px);
     }
     
-    /* 自分（下半分） */
-    .video-container:nth-child(2) {
+    /* 自分（残りのスペースを使用、縮小可能） */
+    .video-container:nth-child(3) {
         position: relative;
         width: 100%;
-        height: calc(50% - 25px);
-        flex-shrink: 0;
+        flex: 1;
+        min-height: 0;
     }
     
-    
-    .video-container:nth-child(2) .aa-display {
-        font-size: var(--aa-font-size, 8px);
-        letter-spacing: calc(var(--aa-font-size, 8px) * 0.4);
+    .video-container:nth-child(3) .aa-display {
+        font-size: var(--aa-font-size, 4px);
+        letter-spacing: calc(var(--aa-font-size, 4px) * 0.4);
         height: 100%;
-        min-height: unset;
-        max-height: unset;
-        overflow: hidden;
+        min-height: 15vh;
+        max-height: 100%;
+        overflow: visible;
         line-height: 1.0;
         border: 1px solid #ffffff;
         white-space: pre;
         word-break: keep-all;
-        width: auto;
+        width: calc(80 * var(--aa-font-size, 4px) * 0.6 + 79 * var(--aa-font-size, 4px) * 0.4);
+        height: calc(60 * var(--aa-font-size, 4px));
         margin: 0 auto;
+        transform-origin: top center;
+        transform: scale(1);
         max-width: calc(100vw - 4px);
+        max-height: 100%;
         padding: 0;
     }
 }
