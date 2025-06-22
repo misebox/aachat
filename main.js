@@ -150,6 +150,11 @@ async function startCamera() {
     }
 }
 
+// ダイナミックレンジ調整パラメータ
+let minBrightness = 0;
+let maxBrightness = 255;
+let dynamicRangeEnabled = true;
+
 function videoToAscii(video) {
     if (!video.videoWidth || !video.videoHeight) return '';
     
@@ -164,9 +169,22 @@ function videoToAscii(video) {
     for (let y = 0; y < AA_HEIGHT; y++) {
         for (let x = 0; x < AA_WIDTH; x++) {
             const i = (y * AA_WIDTH + x) * 4;
-            const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-            const charIndex = Math.floor((brightness / 255) * (ASCII_CHARS.length - 1));
-            ascii += ASCII_CHARS[charIndex];
+            let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+            
+            // ダイナミックレンジ調整
+            if (dynamicRangeEnabled && maxBrightness > minBrightness) {
+                // 現在の輝度を0-1の範囲に正規化
+                brightness = (brightness - minBrightness) / (maxBrightness - minBrightness);
+                brightness = Math.max(0, Math.min(1, brightness)); // クリップ
+                
+                // ASCII_CHARSのインデックスに変換
+                const charIndex = Math.floor(brightness * (ASCII_CHARS.length - 1));
+                ascii += ASCII_CHARS[charIndex];
+            } else {
+                // 通常の変換
+                const charIndex = Math.floor((brightness / 255) * (ASCII_CHARS.length - 1));
+                ascii += ASCII_CHARS[charIndex];
+            }
         }
         ascii += '\n';
     }
@@ -174,7 +192,84 @@ function videoToAscii(video) {
     return ascii;
 }
 
+// ダイナミックレンジ分析
+function analyzeAndAdjustContrast(video) {
+    if (!video.videoWidth || !video.videoHeight) return;
+    
+    // サンプリング用の小さいキャンバス
+    const sampleWidth = 64;
+    const sampleHeight = 64;
+    elements.canvas.width = sampleWidth;
+    elements.canvas.height = sampleHeight;
+    
+    ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
+    const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+    const pixels = imageData.data;
+    
+    // 明度の統計を計算
+    let min = 255;
+    let max = 0;
+    let sum = 0;
+    let count = 0;
+    const brightnessValues = [];
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+        const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        brightnessValues.push(brightness);
+        min = Math.min(min, brightness);
+        max = Math.max(max, brightness);
+        sum += brightness;
+        count++;
+    }
+    
+    const mean = sum / count;
+    
+    // 分散と標準偏差を計算
+    let variance = 0;
+    for (const brightness of brightnessValues) {
+        variance += Math.pow(brightness - mean, 2);
+    }
+    variance /= count;
+    const stdDev = Math.sqrt(variance);
+    
+    // パーセンタイルを計算（外れ値除去のため）
+    brightnessValues.sort((a, b) => a - b);
+    const percentile5 = brightnessValues[Math.floor(count * 0.05)];
+    const percentile95 = brightnessValues[Math.floor(count * 0.95)];
+    
+    // 分散に基づいた調整
+    if (stdDev < 20) {
+        // 低分散（単調な画像）: より積極的にレンジを拡張
+        minBrightness = Math.max(0, mean - stdDev * 3);
+        maxBrightness = Math.min(255, mean + stdDev * 3);
+    } else if (stdDev > 60) {
+        // 高分散（コントラストが高い）: 外れ値を除外
+        minBrightness = Math.max(0, percentile5 - 10);
+        maxBrightness = Math.min(255, percentile95 + 10);
+    } else {
+        // 中分散: バランスの取れた調整
+        const margin = stdDev * 0.5;
+        minBrightness = Math.max(0, min - margin);
+        maxBrightness = Math.min(255, max + margin);
+    }
+    
+    // レンジが狭すぎる場合は調整
+    if (maxBrightness - minBrightness < 30) {
+        const center = (minBrightness + maxBrightness) / 2;
+        minBrightness = Math.max(0, center - 15);
+        maxBrightness = Math.min(255, center + 15);
+    }
+}
+
 function startAAConversion() {
+    // コントラスト調整タイマー（1秒ごと）
+    setInterval(() => {
+        if (elements.localVideo.srcObject && elements.localVideo.videoWidth > 0) {
+            analyzeAndAdjustContrast(elements.localVideo);
+        }
+    }, 1000);
+    
+    // AA変換タイマー（100msごと）
     setInterval(() => {
         // ローカルビデオからAAを生成して表示
         if (elements.localVideo.srcObject && elements.localVideo.videoWidth > 0) {
