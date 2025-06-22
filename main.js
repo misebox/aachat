@@ -134,6 +134,7 @@ async function startCamera() {
                 video: { 
                     width: { exact: 80 }, 
                     height: { exact: 60 },
+                    frameRate: { ideal: 60, min: 30 },
                     facingMode: 'user'
                 }, 
                 audio: true 
@@ -145,6 +146,7 @@ async function startCamera() {
                     video: { 
                         width: { exact: 160 }, 
                         height: { exact: 120 },
+                        frameRate: { ideal: 60, min: 30 },
                         facingMode: 'user'
                     }, 
                     audio: true 
@@ -155,6 +157,7 @@ async function startCamera() {
                     video: { 
                         width: { exact: 320 }, 
                         height: { exact: 240 },
+                        frameRate: { ideal: 60, min: 30 },
                         facingMode: 'user'
                     }, 
                     audio: true 
@@ -190,6 +193,8 @@ function videoToAscii(video) {
     ctx.drawImage(video, 0, 0, AA_WIDTH, AA_HEIGHT);
     const imageData = ctx.getImageData(0, 0, AA_WIDTH, AA_HEIGHT);
     const pixels = imageData.data;
+    
+    // 軽量グレースケール変換（AA変換時のみ）
     
     let ascii = '';
     for (let y = 0; y < AA_HEIGHT; y++) {
@@ -295,7 +300,7 @@ function startAAConversion() {
         }
     }, 1000);
     
-    // AA変換タイマー（100msごと）
+    // AA変換タイマー（60fpsに合わせて約16msごと）
     setInterval(() => {
         // ローカルビデオからAAを生成して表示
         if (elements.localVideo.srcObject && elements.localVideo.videoWidth > 0) {
@@ -308,7 +313,7 @@ function startAAConversion() {
             const remoteAA = videoToAscii(elements.remoteVideo);
             elements.remoteAA.textContent = remoteAA;
         }
-    }, 100);
+    }, 16); // 約60fps
 }
 
 function stopAllPolling() {
@@ -386,12 +391,27 @@ async function createPeerConnection() {
         rtcpMuxPolicy: 'require' // RTCP多重化
     });
     
+    
     console.log('ローカルストリーム追加開始');
     localStream.getTracks().forEach(track => {
         console.log('トラック追加:', track.kind, track.enabled);
         peerConnection.addTrack(track, localStream);
     });
     console.log('ローカルストリーム追加完了');
+    
+    // 高FPS設定をトラック追加後に設定
+    setTimeout(async () => {
+        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+            const params = sender.getParameters();
+            if (params.encodings && params.encodings.length > 0) {
+                params.encodings[0].maxBitrate = 50000; // 50kbps（高FPS用に増加）
+                params.encodings[0].maxFramerate = 60; // 60FPS設定
+                await sender.setParameters(params);
+                console.log('高FPS設定: 60fps, 50kbps');
+            }
+        }
+    }, 1000);
     
     peerConnection.ontrack = (event) => {
         console.log('リモートトラック受信:', event.track.kind);
