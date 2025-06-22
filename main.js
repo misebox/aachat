@@ -75,6 +75,8 @@ const elements = {
     leaveBtn: document.getElementById('leaveBtn'),
     statusText: document.getElementById('statusText'),
     timer: document.getElementById('timer'),
+    statusText2: document.getElementById('statusText2'),
+    timer2: document.getElementById('timer2'),
     localVideo: document.getElementById('localVideo'),
     remoteVideo: document.getElementById('remoteVideo'),
     localAA: document.getElementById('localAA'),
@@ -82,7 +84,15 @@ const elements = {
     canvas: document.getElementById('canvas'),
     videoSelect: document.getElementById('videoSelect'),
     audioSelect: document.getElementById('audioSelect'),
-    refreshDevices: document.getElementById('refreshDevices')
+    refreshDevices: document.getElementById('refreshDevices'),
+    deviceBtn: document.getElementById('deviceBtn'),
+    mobileDeviceBtn: document.getElementById('mobileDeviceBtn'),
+    deviceDialog: document.getElementById('deviceDialog'),
+    closeDialog: document.getElementById('closeDialog'),
+    videoSelectDialog: document.getElementById('videoSelectDialog'),
+    audioSelectDialog: document.getElementById('audioSelectDialog'),
+    refreshDevicesDialog: document.getElementById('refreshDevicesDialog'),
+    applyDevices: document.getElementById('applyDevices')
 };
 
 const ctx = elements.canvas.getContext('2d');
@@ -117,31 +127,33 @@ async function getAvailableDevices() {
 
 // デバイス選択肢を更新
 function updateDeviceSelects() {
-    // ビデオデバイス
-    elements.videoSelect.innerHTML = '';
-    availableDevices.videoDevices.forEach((device, index) => {
-        const option = document.createElement('option');
-        option.value = device.deviceId;
-        option.textContent = device.label || `カメラ ${index + 1}`;
-        elements.videoSelect.appendChild(option);
-    });
+    // デスクトップ用
+    updateSelectOptions(elements.videoSelect, availableDevices.videoDevices, 'カメラ');
+    updateSelectOptions(elements.audioSelect, availableDevices.audioDevices, 'マイク');
     
-    // 音声デバイス
-    elements.audioSelect.innerHTML = '';
-    availableDevices.audioDevices.forEach((device, index) => {
-        const option = document.createElement('option');
-        option.value = device.deviceId;
-        option.textContent = device.label || `マイク ${index + 1}`;
-        elements.audioSelect.appendChild(option);
-    });
+    // ダイアログ用
+    updateSelectOptions(elements.videoSelectDialog, availableDevices.videoDevices, 'カメラ');
+    updateSelectOptions(elements.audioSelectDialog, availableDevices.audioDevices, 'マイク');
     
     // 現在の選択を保持
     if (selectedDeviceIds.video) {
         elements.videoSelect.value = selectedDeviceIds.video;
+        elements.videoSelectDialog.value = selectedDeviceIds.video;
     }
     if (selectedDeviceIds.audio) {
         elements.audioSelect.value = selectedDeviceIds.audio;
+        elements.audioSelectDialog.value = selectedDeviceIds.audio;
     }
+}
+
+function updateSelectOptions(selectElement, devices, prefix) {
+    selectElement.innerHTML = '';
+    devices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `${prefix} ${index + 1}`;
+        selectElement.appendChild(option);
+    });
 }
 
 // 選択されたデバイスIDを取得
@@ -990,9 +1002,12 @@ function updateTimer() {
     if (!sessionActive && remaining > 0) {
         const minutes = Math.floor(remaining / 60);
         const seconds = remaining % 60;
-        elements.timer.textContent = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const timerText = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        elements.timer.textContent = timerText;
+        elements.timer2.textContent = timerText;
     } else {
         elements.timer.textContent = '';
+        elements.timer2.textContent = '';
     }
 }
 
@@ -1002,6 +1017,7 @@ function clearKeywordTimer() {
         keywordTimer = null;
     }
     elements.timer.textContent = '';
+    elements.timer2.textContent = '';
 }
 
 
@@ -1091,6 +1107,7 @@ function cleanup() {
 
 function updateStatus(text) {
     elements.statusText.textContent = text;
+    elements.statusText2.textContent = text;
 }
 
 async function getConnectionType() {
@@ -1147,6 +1164,7 @@ async function updateConnectionInfo(shouldUpdateStatus = false) {
         // 詳細な接続情報を表示
         const info = `接続: ${connectionState} | ICE: ${iceConnectionState} | 収集: ${iceGatheringState}`;
         elements.timer.textContent = info;
+        elements.timer2.textContent = info;
     }
 }
 
@@ -1234,8 +1252,45 @@ window.addEventListener('resize', () => {
     adjustAAFontSize();
 });
 
+// ダイアログ制御
+function openDeviceDialog() {
+    elements.deviceDialog.style.display = 'flex';
+}
+
+function closeDeviceDialog() {
+    elements.deviceDialog.style.display = 'none';
+}
+
+function applyDeviceSelection() {
+    selectedDeviceIds.video = elements.videoSelectDialog.value;
+    selectedDeviceIds.audio = elements.audioSelectDialog.value;
+    
+    // デスクトップ用の選択も同期
+    elements.videoSelect.value = selectedDeviceIds.video;
+    elements.audioSelect.value = selectedDeviceIds.audio;
+    
+    console.log('デバイス選択適用:', {
+        video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
+        audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text
+    });
+    
+    closeDeviceDialog();
+}
+
 // イベントリスナー設定
+elements.deviceBtn.addEventListener('click', openDeviceDialog);
+elements.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
+elements.closeDialog.addEventListener('click', closeDeviceDialog);
+elements.applyDevices.addEventListener('click', applyDeviceSelection);
 elements.refreshDevices.addEventListener('click', getAvailableDevices);
+elements.refreshDevicesDialog.addEventListener('click', getAvailableDevices);
+
+// ダイアログ外クリックで閉じる
+elements.deviceDialog.addEventListener('click', (e) => {
+    if (e.target === elements.deviceDialog) {
+        closeDeviceDialog();
+    }
+});
 
 elements.videoSelect.addEventListener('change', () => {
     if (localStream) {
