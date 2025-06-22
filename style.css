@@ -26,11 +26,31 @@ h3 {
 }
 
 .device-controls {
-    text-align: center;
-    margin: 10px 0;
-    padding: 10px;
-    background-color: #111;
+    display: none;
+}
+
+.device-button {
+    padding: 8px 12px;
+    font-size: 16px;
+    background-color: transparent;
+    border: 1px solid #666666;
+    color: #ffffff;
+    cursor: pointer;
     border-radius: 4px;
+    display: inline-block;
+}
+
+.desktop-device-btn {
+    display: inline-block;
+}
+
+.mobile-device-btn {
+    display: none;
+}
+
+.device-button:hover {
+    background-color: #333333;
+    border-color: #ffffff;
 }
 
 .device-row {
@@ -53,6 +73,95 @@ h3 {
     border: 1px solid #666666;
     color: #ffffff;
     min-width: 150px;
+}
+
+.desktop-only {
+    display: none;
+}
+
+/* デバイス選択ダイアログ */
+.device-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-content {
+    background-color: #222;
+    border: 1px solid #666;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+}
+
+.dialog-header h3 {
+    margin: 0;
+    color: #ffffff;
+}
+
+#closeDialog {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.dialog-row {
+    margin-bottom: 15px;
+}
+
+.dialog-row label {
+    display: block;
+    margin-bottom: 5px;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.dialog-row select {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    background-color: transparent;
+    border: 1px solid #666666;
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #444;
+}
+
+.dialog-buttons button {
+    padding: 8px 16px;
+    font-size: 14px;
 }
 
 .controls {
@@ -102,6 +211,14 @@ button:disabled {
     font-size: 14px;
 }
 
+.desktop-status {
+    display: block;
+}
+
+.mobile-status {
+    display: none;
+}
+
 #statusText {
     margin-right: 20px;
 }
@@ -125,6 +242,20 @@ button:disabled {
     .chat-area {
         flex-direction: column;
         gap: 20px;
+    }
+    
+    .video-container h3 {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 3px 8px;
+        border-radius: 3px;
+        color: #ffffff;
+        text-shadow: 0 0 5px #ffffff;
+        margin: 0;
+        font-size: 0.9em;
     }
 }
 
@@ -160,25 +291,55 @@ button:disabled {
 }
 
 @media (max-width: 768px) {
+    .desktop-device-btn {
+        display: none;
+    }
+    
+    .mobile-device-btn {
+        display: flex;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 100;
+        padding: 10px;
+        font-size: 18px;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        align-items: center;
+        justify-content: center;
+    }
+    
     .device-controls {
-        margin: 5px 0;
-        padding: 5px;
+        display: block;
+        margin: 0;
+        padding: 0;
+        background: none;
     }
     
-    .device-row {
-        flex-direction: column;
-        gap: 5px;
+    .desktop-only {
+        display: none;
     }
     
-    .device-row label {
-        font-size: 12px;
-        min-width: auto;
+    .device-controls {
+        margin: 0;
+        padding: 0;
+        background: none;
     }
     
-    .device-row select {
-        padding: 3px;
-        font-size: 12px;
-        min-width: 120px;
+    .controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #000;
+        border-top: 1px solid #333;
+        padding: 10px;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
     }
     
     body {
@@ -229,31 +390,46 @@ button:disabled {
         flex-shrink: 0;
     }
     
-    .status {
-        margin: 5px 0;
-        font-size: 14px;
-        padding: 0 5px;
+    .desktop-status {
+        display: none;
+    }
+    
+    .mobile-status {
+        display: flex;
+        position: relative;
+        background-color: rgba(0, 0, 0, 0.8);
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin: 5px 2px;
+        font-size: 12px;
+        color: #ffffff;
         text-align: center;
+        min-height: 20px;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
     
     .chat-area {
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 0;
         margin: 0;
         padding: 0 2px;
-        height: calc(100vh - 60px);
+        height: calc(100vh - 120px);
+        margin-bottom: 60px;
     }
     
     /* 相手（上半分） */
     .video-container:nth-child(1) {
         position: relative;
         width: 100%;
-        height: calc(50% - 2.5px);
+        height: calc(50% - 25px);
         flex-shrink: 0;
     }
     
-    .video-container:nth-child(1) h3 {
+    .video-container h3 {
         font-size: 0.9em;
         margin: 0;
         position: absolute;
@@ -286,23 +462,10 @@ button:disabled {
     .video-container:nth-child(2) {
         position: relative;
         width: 100%;
-        height: calc(50% - 2.5px);
+        height: calc(50% - 25px);
         flex-shrink: 0;
     }
     
-    .video-container:nth-child(2) h3 {
-        font-size: 0.9em;
-        margin: 0;
-        position: absolute;
-        top: 5px;
-        left: 5px;
-        z-index: 10;
-        background: rgba(0, 0, 0, 0.8);
-        padding: 3px 8px;
-        border-radius: 3px;
-        color: #ffffff;
-        text-shadow: 0 0 5px #ffffff;
-    }
     
     .video-container:nth-child(2) .aa-display {
         font-size: var(--aa-font-size, 8px);
