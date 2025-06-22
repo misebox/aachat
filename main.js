@@ -507,8 +507,12 @@ async function createPeerConnection() {
     
     console.log('ローカルストリーム追加開始');
     localStream.getTracks().forEach(track => {
-        console.log('トラック追加:', track.kind, track.enabled);
-        peerConnection.addTrack(track, localStream);
+        console.log('トラック追加:', track.kind, track.enabled, 'readyState:', track.readyState);
+        if (track.readyState === 'live') {
+            peerConnection.addTrack(track, localStream);
+        } else {
+            console.warn('トラックが無効:', track.kind, track.readyState);
+        }
     });
     console.log('ローカルストリーム追加完了');
     
@@ -757,11 +761,24 @@ async function restartHostSession() {
     isWaitingForGuest = false;
     sessionToken = generateSessionToken();
     
+    // ローカルストリームが存在しない場合は再取得
+    if (!localStream) {
+        console.log('ローカルストリームを再取得中...');
+        if (!await startCamera()) {
+            updateStatus('カメラアクセスエラー');
+            return;
+        }
+    }
+    
     // 新しいセッションを開始
     await createPeerConnection();
     setupDataChannel();
     
-    const offer = await peerConnection.createOffer();
+    const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        iceRestart: false
+    });
     await peerConnection.setLocalDescription(offer);
     
     // 新しいトークンでオファーを送信
@@ -785,6 +802,12 @@ async function joinSession() {
     }
     
     currentKeyword = keyword;
+    
+    // 既存ストリームのクリーンアップ
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
     
     if (!await startCamera()) return;
     
@@ -1004,8 +1027,11 @@ function leaveSession() {
     updateStatus('退室しました');
     cleanup();
     
-    // クリーンアップ完了後、接続をリセットするためページをリロード
-    location.reload();
+    // ページリロードではなく、状態をリセット
+    setTimeout(() => {
+        updateStatus('未接続');
+        toggleButtons(true);
+    }, 100);
 }
 
 function cleanup() {
@@ -1028,25 +1054,35 @@ function cleanup() {
         peerConnection = null;
     }
     
-    if (localStream) {
+    // ホスト側は次の接続のためにストリームを保持
+    if (!isHost && localStream) {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
+        elements.localVideo.srcObject = null;
     }
     
-    elements.localVideo.srcObject = null;
     elements.remoteVideo.srcObject = null;
-    elements.localAA.textContent = '';
     elements.remoteAA.textContent = '';
     
-    isHost = false;
+    // ホスト側でない場合のみローカルAAをクリア
+    if (!isHost) {
+        elements.localAA.textContent = '';
+        isHost = false;
+    }
+    
     sessionActive = false;
     sessionStartTime = null;
     iceCandidates = [];
     reconnectAttempts = 0;
-    currentKeyword = null;
     connectionEstablished = false;
     isWaitingForGuest = false;
-    sessionToken = null;
+    
+    // ゲスト退室時はホスト状態を保持
+    if (!isHost) {
+        currentKeyword = null;
+        sessionToken = null;
+    }
+    
     clearKeywordTimer();
     clearReconnectInterval();
     
