@@ -128,16 +128,42 @@ async function playVideoSafely(videoElement, label) {
 
 async function startCamera() {
     try {
-        // スマホ対応のため制約を緩和
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                width: { ideal: 640, max: 1280 }, 
-                height: { ideal: 480, max: 720 },
-                facingMode: 'user'
-            }, 
-            audio: true 
-        });
+        // 80x60で試行
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { exact: 80 }, 
+                    height: { exact: 60 },
+                    facingMode: 'user'
+                }, 
+                audio: true 
+            });
+        } catch {
+            // フォールバック: 160x120
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { exact: 160 }, 
+                        height: { exact: 120 },
+                        facingMode: 'user'
+                    }, 
+                    audio: true 
+                });
+            } catch {
+                // 最終フォールバック: 320x240
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { exact: 320 }, 
+                        height: { exact: 240 },
+                        facingMode: 'user'
+                    }, 
+                    audio: true 
+                });
+            }
+        }
+        
         elements.localVideo.srcObject = localStream;
+        console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
         
         // ローカルビデオの適切な再生処理
         await playVideoSafely(elements.localVideo, 'ローカル');
