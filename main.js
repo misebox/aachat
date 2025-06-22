@@ -1374,9 +1374,22 @@ function closeDeviceDialog() {
     elements.deviceDialog.style.display = 'none';
 }
 
-function applyDeviceSelection() {
-    selectedDeviceIds.video = elements.videoSelectDialog.value;
-    selectedDeviceIds.audio = elements.audioSelectDialog.value;
+async function applyDeviceSelection() {
+    const newVideoDeviceId = elements.videoSelectDialog.value;
+    const newAudioDeviceId = elements.audioSelectDialog.value;
+    
+    // デバイス変更があるかチェック
+    const videoChanged = selectedDeviceIds.video !== newVideoDeviceId;
+    const audioChanged = selectedDeviceIds.audio !== newAudioDeviceId;
+    
+    if (!videoChanged && !audioChanged) {
+        closeDeviceDialog();
+        return;
+    }
+    
+    // 選択デバイスIDを更新
+    selectedDeviceIds.video = newVideoDeviceId;
+    selectedDeviceIds.audio = newAudioDeviceId;
     
     // デスクトップ用の選択も同期
     elements.videoSelect.value = selectedDeviceIds.video;
@@ -1384,10 +1397,105 @@ function applyDeviceSelection() {
     
     console.log('デバイス選択適用:', {
         video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
-        audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text
+        audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text,
+        sessionActive: sessionActive
     });
     
+    // 通話中の場合はデバイスを切り替え
+    if (sessionActive && localStream && peerConnection) {
+        try {
+            await switchDeviceDuringCall(videoChanged, audioChanged);
+        } catch (error) {
+            console.error('通話中のデバイス切り替えエラー:', error);
+            alert('デバイスの切り替えに失敗しました: ' + error.message);
+        }
+    }
+    
     closeDeviceDialog();
+}
+
+// ビデオ制約を取得
+function getVideoConstraints() {
+    return {
+        width: { exact: 80 }, 
+        height: { exact: 60 },
+        frameRate: { ideal: 60, min: 30 },
+        facingMode: 'user'
+    };
+}
+
+// 通話中のデバイス切り替え
+async function switchDeviceDuringCall(videoChanged, audioChanged) {
+    const constraints = {};
+    
+    // 変更が必要なデバイスの制約を設定
+    if (videoChanged) {
+        constraints.video = selectedDeviceIds.video ? 
+            { deviceId: { exact: selectedDeviceIds.video }, ...getVideoConstraints() } : 
+            getVideoConstraints();
+    }
+    
+    if (audioChanged) {
+        constraints.audio = selectedDeviceIds.audio ? 
+            { deviceId: { exact: selectedDeviceIds.audio } } : 
+            true;
+    }
+    
+    console.log('デバイス切り替え開始:', constraints);
+    
+    // 新しいストリームを取得
+    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    // トラックを置換
+    const senders = peerConnection.getSenders();
+    
+    if (videoChanged && newStream.getVideoTracks().length > 0) {
+        const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+        if (videoSender) {
+            const oldTrack = videoSender.track;
+            await videoSender.replaceTrack(newStream.getVideoTracks()[0]);
+            oldTrack.stop();
+            console.log('ビデオトラック切り替え完了');
+        }
+    }
+    
+    if (audioChanged && newStream.getAudioTracks().length > 0) {
+        const audioSender = senders.find(sender => sender.track && sender.track.kind === 'audio');
+        if (audioSender) {
+            const oldTrack = audioSender.track;
+            await audioSender.replaceTrack(newStream.getAudioTracks()[0]);
+            oldTrack.stop();
+            console.log('オーディオトラック切り替え完了');
+        }
+    }
+    
+    // ローカルストリームを更新
+    if (videoChanged) {
+        const oldVideoTracks = localStream.getVideoTracks();
+        oldVideoTracks.forEach(track => {
+            localStream.removeTrack(track);
+            track.stop();
+        });
+        newStream.getVideoTracks().forEach(track => {
+            localStream.addTrack(track);
+        });
+    }
+    
+    if (audioChanged) {
+        const oldAudioTracks = localStream.getAudioTracks();
+        oldAudioTracks.forEach(track => {
+            localStream.removeTrack(track);
+            track.stop();
+        });
+        newStream.getAudioTracks().forEach(track => {
+            localStream.addTrack(track);
+        });
+    }
+    
+    // ローカルビデオ要素を更新
+    elements.localVideo.srcObject = localStream;
+    
+    console.log('デバイス切り替え完了');
 }
 
 // イベントリスナー設定
