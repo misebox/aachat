@@ -65,6 +65,7 @@ let activePollingIntervals = [];
 let connectionEstablished = false;
 let isWaitingForGuest = false;
 let sessionToken = null;
+let currentAbortController = null;
 
 const elements = {
     keyword: document.getElementById('keyword'),
@@ -218,22 +219,39 @@ async function sendSignal(keyword, data) {
 
 async function receiveSignal(keyword) {
     console.log('受信試行:', keyword);
-    const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`);
     
-    if (!response.ok) {
-        if (response.status === 400) {
-            console.log('受信結果: データなし (400)');
+    // AbortControllerを作成（既存のものがあればキャンセル）
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+    currentAbortController = new AbortController();
+    
+    try {
+        const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
+            signal: currentAbortController.signal
+        });
+        
+        if (!response.ok) {
+            if (response.status === 400) {
+                console.log('受信結果: データなし (400)');
+                return null;
+            }
+            console.error('受信エラー:', response.status, response.statusText);
+            throw new Error('シグナル受信エラー');
+        }
+        
+        const encrypted = await response.text();
+        const decrypted = xorDecrypt(encrypted, keyword);
+        const data = JSON.parse(decrypted);
+        console.log('受信成功:', keyword, 'データタイプ:', data.type);
+        return data;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('受信キャンセル:', keyword);
             return null;
         }
-        console.error('受信エラー:', response.status, response.statusText);
-        throw new Error('シグナル受信エラー');
+        throw error;
     }
-    
-    const encrypted = await response.text();
-    const decrypted = xorDecrypt(encrypted, keyword);
-    const data = JSON.parse(decrypted);
-    console.log('受信成功:', keyword, 'データタイプ:', data.type);
-    return data;
 }
 
 async function createPeerConnection() {
@@ -447,9 +465,6 @@ async function hostSession() {
                                       `または、そのセッションに「参加する」ボタンで参加することもできます。`;
                         
                         alert(message);
-                        
-                        // 提案されたキーワードを入力フィールドに設定
-                        elements.keyword.value = suggestedKeyword;
                         cleanup();
                         return;
                     }
@@ -735,6 +750,13 @@ function leaveSession() {
 
 function cleanup() {
     stopAllPolling(); // 全ポーリング停止
+    
+    // 進行中のppng.io接続をキャンセル
+    if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+        console.log('ppng.io接続をキャンセルしました');
+    }
     
     if (dataChannel) {
         dataChannel.close();
