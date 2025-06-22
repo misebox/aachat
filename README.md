@@ -7,8 +7,8 @@ AA電話は、WebRTCを使用してリアルタイムでビデオをASCIIアー�
 ## 技術構成
 
 ### 使用技術
-- **WebRTC**: ピアツーピア通信
-- **ppng.io**: Public Piping Server（シグナリング用途に転用）
+- **WebRTC**: P2P通信
+- **Piping Server**: シグナリング用途に転用
 - **Canvas API**: 映像処理
 - **MediaDevices API**: カメラ・マイク制御
 
@@ -44,11 +44,12 @@ graph TB
 ## 主要機能
 
 ### 1. WebRTC通信
-- Piping Server（ppng.io）を使用したシグナリング
+- Piping Server を使用したシグナリング
 - GoogleのSTUNサーバーを使用したNAT越え
 - TURNサーバーは使用せず（ファイアウォール等で接続できない場合は通信不可）
 - P2Pでの直接通信
 - 自分でサーバー無しでWebRTC接続
+- DataChannel（'aa-data'）を確立するが、実際のAAデータ送信には使用していない
 
 ### 2. ASCII アート変換
 - カメラ映像を80×60文字の無駄にASCIIアートに変換
@@ -64,7 +65,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant H as ホスト
-    participant P as ppng.io
+    participant P as Public Piping Server
     participant G as ゲスト
     
     H->>H: カメラ起動・AA変換開始
@@ -97,7 +98,7 @@ sequenceDiagram
         end
     end
     
-    Note over H,G: P2P接続確立後はppng.io不要
+    Note over H,G: P2P接続確立後は Public Piping Server 不要
     H->>G: ビデオ/オーディオ直接送信
     G->>H: ビデオ/オーディオ直接送信
     
@@ -114,9 +115,16 @@ sequenceDiagram
 ```
 暗い --> 明るい 
 
-## ppng.ioの活用方法
+## DataChannelの設計と実装状況
 
-ppng.ioは本来Public Piping Serverですが、以下の方法でWebRTCシグナリングに転用しています：
+### 現在のAAデータフロー
+1. 自分のカメラ映像 → ローカルでAA変換 → 自分のAA表示
+2. 相手のビデオストリーム → ローカルでAA変換 → 相手のAA表示
+3. DataChannelはWebRTC接続確立のために必要だが、AAデータ送信には未使用
+
+## Piping Server の活用方法
+
+Piping Serverは本来、一回ですが、以下の方法でWebRTCシグナリングに転用しています：
 
 1. **エンドポイント設計**: 
    - 初回のOffer: `/aachat/{keyword}`
@@ -131,7 +139,7 @@ ppng.ioは本来Public Piping Serverですが、以下の方法でWebRTCシグ�
 
 - キーワードベースの簡易的なアクセス制御
 - 10分間のセッション有効期限
-- XOR暗号化によるSDPデータの保護（ppng.io経由時）
+- XOR暗号化によるSDPデータの保護（piping server経由時）
 
 ## 制限事項
 
