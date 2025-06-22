@@ -1072,11 +1072,13 @@ function cleanup() {
         peerConnection = null;
     }
     
-    // ホスト側は次の接続のためにストリームを保持
-    if (!isHost && localStream) {
+    // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
+    if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
         elements.localVideo.srcObject = null;
+        elements.localAA.textContent = '';
+        console.log('ローカルビデオストリーム停止');
     }
     
     elements.remoteVideo.srcObject = null;
