@@ -34,8 +34,12 @@ h3 {
     background-color: #2a2a2a;
     border: 1px solid #00ff00;
     color: #00ff00;
-    margin-right: 10px;
+    margin-right: 5px;
     font-family: inherit;
+}
+
+#clearBtn {
+    margin-right: 15px;
 }
 
 button {
@@ -133,6 +137,12 @@ button:disabled {
         flex: 1;
         min-width: 0;
         max-width: 150px;
+        margin-right: 2px;
+    }
+    
+    #clearBtn {
+        margin-right: 8px;
+        padding: 3px 6px;
     }
     
     button {

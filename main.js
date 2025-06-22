@@ -69,6 +69,7 @@ let currentAbortController = null;
 
 const elements = {
     keyword: document.getElementById('keyword'),
+    clearBtn: document.getElementById('clearBtn'),
     hostBtn: document.getElementById('hostBtn'),
     joinBtn: document.getElementById('joinBtn'),
     leaveBtn: document.getElementById('leaveBtn'),
@@ -206,7 +207,9 @@ async function sendSignal(keyword, data) {
     
     const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'text/plain' },
+        headers: { 
+            'Content-Type': 'text/plain'
+        },
         body: encrypted
     });
     
@@ -746,6 +749,9 @@ function clearReconnectInterval() {
 function leaveSession() {
     updateStatus('退室しました');
     cleanup();
+    
+    // クリーンアップ完了後、接続をリセットするためページをリロード
+    location.reload();
 }
 
 function cleanup() {
@@ -880,4 +886,24 @@ elements.joinBtn.addEventListener('click', () => {
 
 elements.leaveBtn.addEventListener('click', leaveSession);
 
+// URLパラメータからキーワードを自動入力
+function loadKeywordFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyword = urlParams.get('k');
+    if (keyword) {
+        elements.keyword.value = keyword;
+        elements.keyword.readOnly = true; // 編集不可に設定
+        elements.clearBtn.style.display = 'inline-block'; // クリアボタン表示
+        console.log('URLからキーワードを読み込み:', keyword);
+    }
+}
+
+// クリアボタンのイベントリスナー
+elements.clearBtn.addEventListener('click', () => {
+    // パラメータなしのURLに遷移
+    window.location.href = window.location.pathname;
+});
+
+// ページ読み込み時に実行
+loadKeywordFromURL();
 startAAConversion();
