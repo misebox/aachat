@@ -79,10 +79,78 @@ const elements = {
     remoteVideo: document.getElementById('remoteVideo'),
     localAA: document.getElementById('localAA'),
     remoteAA: document.getElementById('remoteAA'),
-    canvas: document.getElementById('canvas')
+    canvas: document.getElementById('canvas'),
+    videoSelect: document.getElementById('videoSelect'),
+    audioSelect: document.getElementById('audioSelect'),
+    refreshDevices: document.getElementById('refreshDevices')
 };
 
 const ctx = elements.canvas.getContext('2d');
+
+// デバイス管理
+let availableDevices = {
+    videoDevices: [],
+    audioDevices: []
+};
+let selectedDeviceIds = {
+    video: null,
+    audio: null
+};
+
+// デバイス一覧を取得
+async function getAvailableDevices() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        availableDevices.videoDevices = devices.filter(device => device.kind === 'videoinput');
+        availableDevices.audioDevices = devices.filter(device => device.kind === 'audioinput');
+        
+        console.log('ビデオデバイス:', availableDevices.videoDevices.length);
+        console.log('音声デバイス:', availableDevices.audioDevices.length);
+        
+        updateDeviceSelects();
+        
+    } catch (error) {
+        console.error('デバイス取得エラー:', error);
+    }
+}
+
+// デバイス選択肢を更新
+function updateDeviceSelects() {
+    // ビデオデバイス
+    elements.videoSelect.innerHTML = '';
+    availableDevices.videoDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `カメラ ${index + 1}`;
+        elements.videoSelect.appendChild(option);
+    });
+    
+    // 音声デバイス
+    elements.audioSelect.innerHTML = '';
+    availableDevices.audioDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `マイク ${index + 1}`;
+        elements.audioSelect.appendChild(option);
+    });
+    
+    // 現在の選択を保持
+    if (selectedDeviceIds.video) {
+        elements.videoSelect.value = selectedDeviceIds.video;
+    }
+    if (selectedDeviceIds.audio) {
+        elements.audioSelect.value = selectedDeviceIds.audio;
+    }
+}
+
+// 選択されたデバイスIDを取得
+function getSelectedDeviceIds() {
+    return {
+        video: elements.videoSelect.value || undefined,
+        audio: elements.audioSelect.value || undefined
+    };
+}
 
 async function playVideoSafely(videoElement, label) {
     return new Promise((resolve) => {
@@ -128,9 +196,11 @@ async function playVideoSafely(videoElement, label) {
 
 async function startCamera() {
     try {
+        const deviceIds = getSelectedDeviceIds();
+        
         // 80x60で試行
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ 
+            const constraints = { 
                 video: { 
                     width: { exact: 80 }, 
                     height: { exact: 60 },
@@ -138,11 +208,22 @@ async function startCamera() {
                     facingMode: 'user'
                 }, 
                 audio: true 
-            });
+            };
+            
+            // デバイスIDが選択されている場合は指定
+            if (deviceIds.video) {
+                constraints.video.deviceId = { exact: deviceIds.video };
+                delete constraints.video.facingMode; // deviceId指定時はfacingModeを削除
+            }
+            if (deviceIds.audio) {
+                constraints.audio = { deviceId: { exact: deviceIds.audio } };
+            }
+            
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch {
             // フォールバック: 160x120
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
+                const constraints = { 
                     video: { 
                         width: { exact: 160 }, 
                         height: { exact: 120 },
@@ -150,10 +231,20 @@ async function startCamera() {
                         facingMode: 'user'
                     }, 
                     audio: true 
-                });
+                };
+                
+                if (deviceIds.video) {
+                    constraints.video.deviceId = { exact: deviceIds.video };
+                    delete constraints.video.facingMode;
+                }
+                if (deviceIds.audio) {
+                    constraints.audio = { deviceId: { exact: deviceIds.audio } };
+                }
+                
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch {
                 // 最終フォールバック: 320x240
-                localStream = await navigator.mediaDevices.getUserMedia({ 
+                const constraints = { 
                     video: { 
                         width: { exact: 320 }, 
                         height: { exact: 240 },
@@ -161,12 +252,34 @@ async function startCamera() {
                         facingMode: 'user'
                     }, 
                     audio: true 
-                });
+                };
+                
+                if (deviceIds.video) {
+                    constraints.video.deviceId = { exact: deviceIds.video };
+                    delete constraints.video.facingMode;
+                }
+                if (deviceIds.audio) {
+                    constraints.audio = { deviceId: { exact: deviceIds.audio } };
+                }
+                
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
             }
         }
         
         elements.localVideo.srcObject = localStream;
         console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
+        
+        // 使用中のデバイス情報を保存
+        const videoTrack = localStream.getVideoTracks()[0];
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (videoTrack) {
+            selectedDeviceIds.video = videoTrack.getSettings().deviceId;
+            console.log('使用中ビデオデバイス:', videoTrack.label);
+        }
+        if (audioTrack) {
+            selectedDeviceIds.audio = audioTrack.getSettings().deviceId;
+            console.log('使用中音声デバイス:', audioTrack.label);
+        }
         
         // ローカルビデオの適切な再生処理
         await playVideoSafely(elements.localVideo, 'ローカル');
@@ -1085,7 +1198,23 @@ window.addEventListener('resize', () => {
     adjustAAFontSize();
 });
 
+// イベントリスナー設定
+elements.refreshDevices.addEventListener('click', getAvailableDevices);
+
+elements.videoSelect.addEventListener('change', () => {
+    if (localStream) {
+        console.log('ビデオデバイス変更:', elements.videoSelect.options[elements.videoSelect.selectedIndex].text);
+    }
+});
+
+elements.audioSelect.addEventListener('change', () => {
+    if (localStream) {
+        console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
+    }
+});
+
 // ページ読み込み時に実行
 loadKeywordFromURL();
 startAAConversion();
 adjustAAFontSize();
+getAvailableDevices();
