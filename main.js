@@ -1218,10 +1218,9 @@ function adjustAAFontSize() {
     const containerWidth = window.innerWidth;
     const containerHeight = window.innerHeight;
     
-    // モバイルの場合は1.2vwを使用
+    // モバイルの場合は個別に調整
     if (containerWidth <= 768) {
-        document.documentElement.style.setProperty('--aa-font-size', '1.2vw');
-        console.log('AA表示フォントサイズ調整: 1.2vw (モバイル)');
+        adjustMobileAASize();
         return;
     }
     
@@ -1247,10 +1246,81 @@ function adjustAAFontSize() {
     console.log('AA表示フォントサイズ調整:', fontSize + 'px');
 }
 
+// モバイル用のAAサイズ調整
+function adjustMobileAASize() {
+    // iOSキーボード対応：画面の実際のサイズではなく、ビューポートサイズを使用
+    const containerHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const containerWidth = window.innerWidth;
+    
+    // キーボードが表示されている場合の検出
+    const isKeyboardVisible = window.visualViewport && window.visualViewport.height < window.screen.height * 0.75;
+    
+    // キーボード表示時は基準サイズを固定値で使用
+    const baseHeight = isKeyboardVisible ? window.screen.height : containerHeight;
+    const availableHeight = baseHeight - 120; // コントロールとタイトルを除く
+    const statusHeight = 50; // ステータス表示分
+    
+    // 相手のAAは40vhで固定（基準サイズに対して）
+    const remoteHeight = baseHeight * 0.4;
+    const localAvailableHeight = availableHeight - remoteHeight - statusHeight;
+    
+    // 相手のAAサイズ（40vhに収まるように計算）
+    const remoteMaxHeight = baseHeight * 0.4;
+    const remoteFontSize = Math.max(4, Math.min(10, remoteMaxHeight / 60, containerWidth * 0.012));
+    
+    // 自分のAAサイズ（縮小可能）
+    const localFontSize = Math.max(3, Math.min(8, localAvailableHeight / 60, containerWidth * 0.01));
+    
+    // 相手のAAサイズ設定
+    document.documentElement.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
+    document.documentElement.style.setProperty('--aa-font-size', `${remoteFontSize}px`);
+    
+    // 自分のAAだけ別のサイズに設定
+    const localAA = document.getElementById('localAA');
+    if (localAA) {
+        localAA.style.fontSize = `${localFontSize}px`;
+        localAA.style.letterSpacing = `${localFontSize * 0.4}px`;
+        localAA.style.width = `${80 * localFontSize * 0.6 + 79 * localFontSize * 0.4}px`;
+        localAA.style.height = `${60 * localFontSize}px`;
+        
+        // 必要に応じてスケール調整
+        const maxWidth = containerWidth - 4;
+        const calculatedWidth = 80 * localFontSize * 0.6 + 79 * localFontSize * 0.4;
+        const maxHeight = localAvailableHeight - 10;
+        const calculatedHeight = 60 * localFontSize;
+        
+        let scale = 1;
+        if (calculatedWidth > maxWidth) {
+            scale = Math.min(scale, maxWidth / calculatedWidth);
+        }
+        if (calculatedHeight > maxHeight) {
+            scale = Math.min(scale, maxHeight / calculatedHeight);
+        }
+        
+        localAA.style.transform = `scale(${scale})`;
+    }
+    
+    console.log('モバイルAAサイズ調整:', {
+        remote: remoteFontSize + 'px',
+        local: localFontSize + 'px',
+        scale: localAA ? localAA.style.transform : 'none',
+        keyboardVisible: isKeyboardVisible,
+        baseHeight: baseHeight,
+        containerHeight: containerHeight
+    });
+}
+
 // リサイズイベントでフォントサイズ調整
 window.addEventListener('resize', () => {
     adjustAAFontSize();
 });
+
+// Visual Viewport API対応（iOSキーボード表示時の対応）
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        adjustAAFontSize();
+    });
+}
 
 // ダイアログ制御
 function openDeviceDialog() {
