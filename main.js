@@ -36,38 +36,41 @@ class Config {
   }
 }
 
-// セッショントークン生成
-function generateSessionToken() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 16; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+// Utility class for utility functions
+class Utility {
+  // セッショントークン生成
+  static generateSessionToken() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 16; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
   }
-  return token;
-}
 
-function generateSuggestedKeyword(baseKeyword) {
-  const suffixes = ['2', '3', 'b', 'alt', 'new', 'x'];
-  const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-  return baseKeyword + randomSuffix;
-}
-
-// XOR暗号化用の関数
-function xorEncrypt(text, key) {
-  const encrypted = [];
-  for (let i = 0; i < text.length; i++) {
-    encrypted.push(String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+  static generateSuggestedKeyword(baseKeyword) {
+    const suffixes = ['2', '3', 'b', 'alt', 'new', 'x'];
+    const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+    return baseKeyword + randomSuffix;
   }
-  return btoa(encrypted.join(''));
-}
 
-function xorDecrypt(encryptedBase64, key) {
-  const encrypted = atob(encryptedBase64);
-  const decrypted = [];
-  for (let i = 0; i < encrypted.length; i++) {
-    decrypted.push(String.fromCharCode(encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+  // XOR暗号化用の関数
+  static xorEncrypt(text, key) {
+    const encrypted = [];
+    for (let i = 0; i < text.length; i++) {
+      encrypted.push(String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    }
+    return btoa(encrypted.join(''));
   }
-  return decrypted.join('');
+
+  static xorDecrypt(encryptedBase64, key) {
+    const encrypted = atob(encryptedBase64);
+    const decrypted = [];
+    for (let i = 0; i < encrypted.length; i++) {
+      decrypted.push(String.fromCharCode(encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    }
+    return decrypted.join('');
+  }
 }
 
 
@@ -480,7 +483,7 @@ function addPollingInterval(intervalId) {
 async function sendSignal(keyword, data) {
   console.log('送信中:', keyword, 'データタイプ:', data.type);
   const json = JSON.stringify(data);
-  const encrypted = xorEncrypt(json, keyword);
+  const encrypted = Utility.xorEncrypt(json, keyword);
   
   const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
     method: 'PUT',
@@ -521,7 +524,7 @@ async function receiveSignal(keyword) {
     }
     
     const encrypted = await response.text();
-    const decrypted = xorDecrypt(encrypted, keyword);
+    const decrypted = Utility.xorDecrypt(encrypted, keyword);
     const data = JSON.parse(decrypted);
     console.log('受信成功:', keyword, 'データタイプ:', data.type);
     return data;
@@ -726,7 +729,7 @@ async function createPeerConnection() {
     await peerConnection.setLocalDescription(offer);
     
     // セッショントークンを生成
-    sessionToken = generateSessionToken();
+    sessionToken = Utility.generateSessionToken();
     
     console.log('オファーを送信中:', keyword, 'トークン:', sessionToken);
     try {
@@ -750,7 +753,7 @@ async function createPeerConnection() {
             const errorText = await response.text();
             if (errorText.includes('Another sender has been connected')) {
               // 既存ホストが存在
-              const suggestedKeyword = generateSuggestedKeyword(keyword);
+              const suggestedKeyword = Utility.generateSuggestedKeyword(keyword);
               updateStatus('エラー: このキーワードは既に使用されています');
               
               const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
@@ -794,7 +797,7 @@ async function createPeerConnection() {
     iceCandidates = [];
     connectionEstablished = false;
     isWaitingForGuest = false;
-    sessionToken = generateSessionToken();
+    sessionToken = Utility.generateSessionToken();
     
     // ローカルストリームが存在しない場合は再取得
     if (!localStream) {
