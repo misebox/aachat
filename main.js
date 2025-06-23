@@ -658,6 +658,159 @@ class SignalingManager {
   }
 }
 
+// ASCIIConverter class for video processing
+class ASCIIConverter {
+  constructor(canvas, ctx) {
+    this.canvas = canvas;
+    this.ctx = ctx;
+    this.minBrightness = 0;
+    this.maxBrightness = 255;
+    this.dynamicRangeEnabled = true;
+    this.contrastTimer = null;
+    this.conversionTimer = null;
+  }
+
+  videoToAscii(video) {
+    if (!video.videoWidth || !video.videoHeight) return '';
+    
+    this.canvas.width = Config.AA_WIDTH;
+    this.canvas.height = Config.AA_HEIGHT;
+    
+    this.ctx.drawImage(video, 0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
+    const imageData = this.ctx.getImageData(0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
+    const pixels = imageData.data;
+    
+    let ascii = '';
+    for (let y = 0; y < Config.AA_HEIGHT; y++) {
+      for (let x = 0; x < Config.AA_WIDTH; x++) {
+        const i = (y * Config.AA_WIDTH + x) * 4;
+        let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        
+        // ダイナミックレンジ調整
+        if (this.dynamicRangeEnabled && this.maxBrightness > this.minBrightness) {
+          // 現在の輝度を0-1の範囲に正規化
+          brightness = (brightness - this.minBrightness) / (this.maxBrightness - this.minBrightness);
+          brightness = Math.max(0, Math.min(1, brightness)); // クリップ
+          
+          // ASCII_CHARSのインデックスに変換
+          const charIndex = Math.floor(brightness * (Config.CHAR_COUNT - 1));
+          ascii += Config.ASCII_CHARS[charIndex];
+        } else {
+          // 通常の変換
+          const charIndex = Math.floor((brightness / 255) * (Config.CHAR_COUNT - 1));
+          ascii += Config.ASCII_CHARS[charIndex];
+        }
+      }
+      ascii += '\n';
+    }
+    
+    return ascii;
+  }
+
+  analyzeAndAdjustContrast(video) {
+    if (!video.videoWidth || !video.videoHeight) return;
+    
+    // サンプリング用の小さいキャンバス
+    const sampleWidth = 64;
+    const sampleHeight = 64;
+    this.canvas.width = sampleWidth;
+    this.canvas.height = sampleHeight;
+    
+    this.ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
+    const imageData = this.ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+    const pixels = imageData.data;
+    
+    // 明度の統計を計算
+    let min = 255;
+    let max = 0;
+    let sum = 0;
+    let count = 0;
+    const brightnessValues = [];
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      brightnessValues.push(brightness);
+      min = Math.min(min, brightness);
+      max = Math.max(max, brightness);
+      sum += brightness;
+      count++;
+    }
+    
+    const mean = sum / count;
+    
+    // 分散と標準偏差を計算
+    let variance = 0;
+    for (const brightness of brightnessValues) {
+      variance += Math.pow(brightness - mean, 2);
+    }
+    variance /= count;
+    const stdDev = Math.sqrt(variance);
+    
+    // パーセンタイルを計算（外れ値除去のため）
+    brightnessValues.sort((a, b) => a - b);
+    const percentile5 = brightnessValues[Math.floor(count * 0.05)];
+    const percentile95 = brightnessValues[Math.floor(count * 0.95)];
+    
+    // 分散に基づいた調整
+    if (stdDev < 20) {
+      // 低分散（単調な画像）: より積極的にレンジを拡張
+      this.minBrightness = Math.max(0, mean - stdDev * 3);
+      this.maxBrightness = Math.min(255, mean + stdDev * 3);
+    } else if (stdDev > 60) {
+      // 高分散（コントラストが高い）: 外れ値を除外
+      this.minBrightness = Math.max(0, percentile5 - 10);
+      this.maxBrightness = Math.min(255, percentile95 + 10);
+    } else {
+      // 中分散: バランスの取れた調整
+      const margin = stdDev * 0.5;
+      this.minBrightness = Math.max(0, min - margin);
+      this.maxBrightness = Math.min(255, max + margin);
+    }
+    
+    // レンジが狭すぎる場合は調整
+    if (this.maxBrightness - this.minBrightness < 30) {
+      const center = (this.minBrightness + this.maxBrightness) / 2;
+      this.minBrightness = Math.max(0, center - 15);
+      this.maxBrightness = Math.min(255, center + 15);
+    }
+  }
+
+  startConversion(localVideo, remoteVideo, localAA, remoteAA) {
+    // コントラスト調整タイマー（1秒ごと）
+    this.contrastTimer = setInterval(() => {
+      if (localVideo.srcObject && localVideo.videoWidth > 0) {
+        this.analyzeAndAdjustContrast(localVideo);
+      }
+    }, 1000);
+    
+    // AA変換タイマー（60fpsに合わせて約16msごと）
+    this.conversionTimer = setInterval(() => {
+      // ローカルビデオからAAを生成して表示
+      if (localVideo.srcObject && localVideo.videoWidth > 0) {
+        const localAAText = this.videoToAscii(localVideo);
+        localAA.textContent = localAAText;
+      }
+      
+      // リモートビデオからAAを生成して表示
+      if (remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
+        const remoteAAText = this.videoToAscii(remoteVideo);
+        remoteAA.textContent = remoteAAText;
+      }
+    }, 16); // 約60fps
+  }
+
+  stopConversion() {
+    if (this.contrastTimer) {
+      clearInterval(this.contrastTimer);
+      this.contrastTimer = null;
+    }
+    if (this.conversionTimer) {
+      clearInterval(this.conversionTimer);
+      this.conversionTimer = null;
+    }
+  }
+}
+
 
 // Global instances
 const mediaManager = new MediaManager();
@@ -704,6 +857,7 @@ const elements = {
 };
 
 const ctx = elements.canvas.getContext('2d');
+const asciiConverter = new ASCIIConverter(elements.canvas, ctx);
 
 
 // デバイス選択肢を更新
@@ -781,142 +935,7 @@ async function playVideoSafely(videoElement, label) {
 }
 
 
-// ダイナミックレンジ調整パラメータ
-let minBrightness = 0;
-let maxBrightness = 255;
-let dynamicRangeEnabled = true;
-
-function videoToAscii(video) {
-  if (!video.videoWidth || !video.videoHeight) return '';
-  
-  elements.canvas.width = Config.AA_WIDTH;
-  elements.canvas.height = Config.AA_HEIGHT;
-  
-  ctx.drawImage(video, 0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
-  const imageData = ctx.getImageData(0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
-  const pixels = imageData.data;
-  
-  // 軽量グレースケール変換（AA変換時のみ）
-  
-  let ascii = '';
-  for (let y = 0; y < Config.AA_HEIGHT; y++) {
-    for (let x = 0; x < Config.AA_WIDTH; x++) {
-      const i = (y * Config.AA_WIDTH + x) * 4;
-      let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-      
-      // ダイナミックレンジ調整
-      if (dynamicRangeEnabled && maxBrightness > minBrightness) {
-        // 現在の輝度を0-1の範囲に正規化
-        brightness = (brightness - minBrightness) / (maxBrightness - minBrightness);
-        brightness = Math.max(0, Math.min(1, brightness)); // クリップ
-        
-        // ASCII_CHARSのインデックスに変換
-        const charIndex = Math.floor(brightness * (Config.CHAR_COUNT - 1));
-        ascii += Config.ASCII_CHARS[charIndex];
-      } else {
-        // 通常の変換
-        const charIndex = Math.floor((brightness / 255) * (Config.CHAR_COUNT - 1));
-        ascii += Config.ASCII_CHARS[charIndex];
-      }
-    }
-    ascii += '\n';
-  }
-  
-  return ascii;
-}
-
-// ダイナミックレンジ分析
-function analyzeAndAdjustContrast(video) {
-  if (!video.videoWidth || !video.videoHeight) return;
-  
-  // サンプリング用の小さいキャンバス
-  const sampleWidth = 64;
-  const sampleHeight = 64;
-  elements.canvas.width = sampleWidth;
-  elements.canvas.height = sampleHeight;
-  
-  ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
-  const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
-  const pixels = imageData.data;
-  
-  // 明度の統計を計算
-  let min = 255;
-  let max = 0;
-  let sum = 0;
-  let count = 0;
-  const brightnessValues = [];
-  
-  for (let i = 0; i < pixels.length; i += 4) {
-    const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-    brightnessValues.push(brightness);
-    min = Math.min(min, brightness);
-    max = Math.max(max, brightness);
-    sum += brightness;
-    count++;
-  }
-  
-  const mean = sum / count;
-  
-  // 分散と標準偏差を計算
-  let variance = 0;
-  for (const brightness of brightnessValues) {
-    variance += Math.pow(brightness - mean, 2);
-  }
-  variance /= count;
-  const stdDev = Math.sqrt(variance);
-  
-  // パーセンタイルを計算（外れ値除去のため）
-  brightnessValues.sort((a, b) => a - b);
-  const percentile5 = brightnessValues[Math.floor(count * 0.05)];
-  const percentile95 = brightnessValues[Math.floor(count * 0.95)];
-  
-  // 分散に基づいた調整
-  if (stdDev < 20) {
-    // 低分散（単調な画像）: より積極的にレンジを拡張
-    minBrightness = Math.max(0, mean - stdDev * 3);
-    maxBrightness = Math.min(255, mean + stdDev * 3);
-  } else if (stdDev > 60) {
-    // 高分散（コントラストが高い）: 外れ値を除外
-    minBrightness = Math.max(0, percentile5 - 10);
-    maxBrightness = Math.min(255, percentile95 + 10);
-  } else {
-    // 中分散: バランスの取れた調整
-    const margin = stdDev * 0.5;
-    minBrightness = Math.max(0, min - margin);
-    maxBrightness = Math.min(255, max + margin);
-  }
-  
-  // レンジが狭すぎる場合は調整
-  if (maxBrightness - minBrightness < 30) {
-    const center = (minBrightness + maxBrightness) / 2;
-    minBrightness = Math.max(0, center - 15);
-    maxBrightness = Math.min(255, center + 15);
-  }
-}
-
-function startAAConversion() {
-  // コントラスト調整タイマー（1秒ごと）
-  setInterval(() => {
-    if (elements.localVideo.srcObject && elements.localVideo.videoWidth > 0) {
-      analyzeAndAdjustContrast(elements.localVideo);
-    }
-  }, 1000);
-  
-  // AA変換タイマー（60fpsに合わせて約16msごと）
-  setInterval(() => {
-    // ローカルビデオからAAを生成して表示
-    if (elements.localVideo.srcObject && elements.localVideo.videoWidth > 0) {
-      const localAA = videoToAscii(elements.localVideo);
-      elements.localAA.textContent = localAA;
-    }
-    
-    // リモートビデオからAAを生成して表示
-    if (elements.remoteVideo.srcObject && elements.remoteVideo.videoWidth > 0) {
-      const remoteAA = videoToAscii(elements.remoteVideo);
-      elements.remoteAA.textContent = remoteAA;
-    }
-  }, 16); // 約60fps
-}
+// ASCII変換処理は ASCIIConverter クラスに移動
 
 function stopAllPolling() {
   activePollingIntervals.forEach(intervalId => clearInterval(intervalId));
@@ -1289,6 +1308,9 @@ function addPollingInterval(intervalId) {
     
     // 進行中のppng.io接続をキャンセル
     signalingManager.abortCurrentRequest();
+    
+    // ASCII変換を停止
+    asciiConverter.stopConversion();
     
     webRTCManager.close();
     
@@ -1682,7 +1704,7 @@ function addPollingInterval(intervalId) {
   
   // ページ読み込み時に実行
   loadKeywordFromURL();
-  startAAConversion();
+  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
   adjustAAFontSize();
   mediaManager.getAvailableDevices();
   
