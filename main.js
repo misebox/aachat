@@ -36,6 +36,40 @@ class Config {
   }
 }
 
+const _byId = (id) => document.getElementById(id);
+const Elm = {
+  keyword: _byId('keyword'),
+  clearBtn: _byId('clearBtn'),
+  hostBtn: _byId('hostBtn'),
+  joinBtn: _byId('joinBtn'),
+  leaveBtn: _byId('leaveBtn'),
+  statusText: _byId('statusText'),
+  timer: _byId('timer'),
+  statusText2: _byId('statusText2'),
+  timer2: _byId('timer2'),
+  localVideo: _byId('localVideo'),
+  remoteVideo: _byId('remoteVideo'),
+  localAA: _byId('localAA'),
+  remoteAA: _byId('remoteAA'),
+  canvas: _byId('canvas'),
+  videoSelect: _byId('videoSelect'),
+  audioSelect: _byId('audioSelect'),
+  refreshDevices: _byId('refreshDevices'),
+  deviceBtn: _byId('deviceBtn'),
+  mobileDeviceBtn: _byId('mobileDeviceBtn'),
+  deviceDialog: _byId('deviceDialog'),
+  closeDialog: _byId('closeDialog'),
+  videoSelectDialog: _byId('videoSelectDialog'),
+  audioSelectDialog: _byId('audioSelectDialog'),
+  refreshDevicesDialog: _byId('refreshDevicesDialog'),
+  applyDevices: _byId('applyDevices'),
+  helpBtn: _byId('helpBtn'),
+  helpDialog: _byId('helpDialog'),
+  closeHelpDialog: _byId('closeHelpDialog'),
+  mobileHelpBtn: _byId('mobileHelpBtn')
+};
+
+
 // Utility class for utility functions
 class Utility {
   // セッショントークン生成
@@ -75,7 +109,7 @@ class Utility {
 
 // MediaManager class for device and stream management
 class MediaManager {
-  constructor() {
+  constructor(elements) {
     this.localStream = null;
     this.availableDevices = {
       videoDevices: [],
@@ -85,6 +119,7 @@ class MediaManager {
       video: null,
       audio: null
     };
+    this.elements = elements;
   }
 
   async getAvailableDevices() {
@@ -97,7 +132,7 @@ class MediaManager {
       console.log('ビデオデバイス:', this.availableDevices.videoDevices.length);
       console.log('音声デバイス:', this.availableDevices.audioDevices.length);
 
-      updateDeviceSelects();
+      this.updateDeviceSelects();
 
     } catch (error) {
       console.error('デバイス取得エラー:', error);
@@ -106,8 +141,8 @@ class MediaManager {
 
   getSelectedDeviceIds() {
     return {
-      video: elements.videoSelect.value || undefined,
-      audio: elements.audioSelect.value || undefined
+      video: Elm.videoSelect.value || undefined,
+      audio: Elm.audioSelect.value || undefined
     };
   }
 
@@ -183,8 +218,8 @@ class MediaManager {
         }
       }
 
-      elements.localVideo.srcObject = this.localStream;
-      console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
+      Elm.localVideo.srcObject = this.localStream;
+      console.log('カメラ解像度:', Elm.localVideo.videoWidth, 'x', Elm.localVideo.videoHeight);
 
       // 使用中のデバイス情報を保存
       const videoTrack = this.localStream.getVideoTracks()[0];
@@ -199,7 +234,7 @@ class MediaManager {
       }
 
       // ローカルビデオの適切な再生処理
-      await playVideoSafely(elements.localVideo, 'ローカル');
+      await playVideoSafely(Elm.localVideo, 'ローカル');
 
       return true;
     } catch (error) {
@@ -213,7 +248,7 @@ class MediaManager {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());
       this.localStream = null;
-      elements.localVideo.srcObject = null;
+      Elm.localVideo.srcObject = null;
     }
   }
 
@@ -290,7 +325,7 @@ class MediaManager {
     }
 
     // 新しいトラックを使用中のストリームに反映
-    elements.localVideo.srcObject = this.localStream;
+    Elm.localVideo.srcObject = this.localStream;
 
     // 使用中のトラックのうち、新しいストリームに含まれないものを停止
     newStream.getTracks().forEach(track => {
@@ -300,6 +335,26 @@ class MediaManager {
     });
 
     console.log('デバイス切り替え完了');
+  }
+
+  updateDeviceSelects() {
+    // デスクトップ用
+    updateSelectOptions(Elm.videoSelect, this.getAvailableVideoDevices(), 'カメラ');
+    updateSelectOptions(Elm.audioSelect, this.getAvailableAudioDevices(), 'マイク');
+
+    // ダイアログ用
+    updateSelectOptions(Elm.videoSelectDialog, this.getAvailableVideoDevices(), 'カメラ');
+    updateSelectOptions(Elm.audioSelectDialog, this.getAvailableAudioDevices(), 'マイク');
+
+    // 現在の選択を保持
+    if (this.selectedDeviceIds.video) {
+      Elm.videoSelect.value = this.selectedDeviceIds.video;
+      Elm.videoSelectDialog.value = this.selectedDeviceIds.video;
+    }
+    if (this.selectedDeviceIds.audio) {
+      Elm.audioSelect.value = this.selectedDeviceIds.audio;
+      Elm.audioSelectDialog.value = this.selectedDeviceIds.audio;
+    }
   }
 
   getLocalStream() {
@@ -408,24 +463,24 @@ class WebRTCManager {
 
     this.peerConnection.ontrack = (event) => {
       console.log('リモートトラック受信:', event.track.kind);
-      console.log('Remote video element:', this.elements.remoteVideo);
+      console.log('Remote video element:', Elm.remoteVideo);
       console.log('Event streams:', event.streams);
 
-      if (this.elements.remoteVideo && event.streams[0]) {
-        this.elements.remoteVideo.srcObject = event.streams[0];
-        this.elements.remoteVideo.onloadedmetadata = () => {
-          console.log('リモートビデオサイズ:', this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
+      if (Elm.remoteVideo && event.streams[0]) {
+        Elm.remoteVideo.srcObject = event.streams[0];
+        Elm.remoteVideo.onloadedmetadata = () => {
+          console.log('リモートビデオサイズ:', Elm.remoteVideo.videoWidth, 'x', Elm.remoteVideo.videoHeight);
           console.log('Remote video ready for AA conversion');
         };
 
         // より確実なビデオ準備待ち
-        this.elements.remoteVideo.oncanplay = () => {
+        Elm.remoteVideo.oncanplay = () => {
           console.log('Remote video can play - forcing play');
-          this.elements.remoteVideo.play().catch(e => console.log('Remote video play failed:', e));
+          Elm.remoteVideo.play().catch(e => console.log('Remote video play failed:', e));
         };
 
         // リモートビデオの適切な再生処理
-        playVideoSafely(this.elements.remoteVideo, 'リモート');
+        playVideoSafely(Elm.remoteVideo, 'リモート');
       } else {
         console.error('Missing remote video element or stream');
       }
@@ -443,7 +498,7 @@ class WebRTCManager {
         this.iceGatheringTimeout = setTimeout(async () => {
           console.log('ICE候補収集タイムアウト. 候補数:', this.iceCandidates.length);
           if (this.iceCandidates.length > 0) {
-            const keyword = sessionManager.currentKeyword || elements.keyword.value;
+            const keyword = sessionManager.currentKeyword || Elm.keyword.value;
             const iceKey = sessionManager.sessionToken ?
               `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
               `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
@@ -460,7 +515,7 @@ class WebRTCManager {
         if (this.iceGatheringTimeout) clearTimeout(this.iceGatheringTimeout);
         console.log('ICE候補収集完了. 候補数:', this.iceCandidates.length);
         if (this.iceCandidates.length > 0) {
-          const keyword = sessionManager.currentKeyword || elements.keyword.value;
+          const keyword = sessionManager.currentKeyword || Elm.keyword.value;
           const iceKey = sessionManager.sessionToken ?
             `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
             `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
@@ -870,19 +925,19 @@ class UIManager {
   }
 
   updateStatus(text) {
-    this.elements.statusText.textContent = text;
-    this.elements.statusText2.textContent = text;
+    Elm.statusText.textContent = text;
+    Elm.statusText2.textContent = text;
   }
 
   toggleButtons(enabled) {
-    this.elements.hostBtn.disabled = !enabled;
-    this.elements.joinBtn.disabled = !enabled;
+    Elm.hostBtn.disabled = !enabled;
+    Elm.joinBtn.disabled = !enabled;
 
     // モバイルでもボタンを完全に非表示にする
-    this.elements.hostBtn.style.display = enabled ? 'inline-block' : 'none';
-    this.elements.joinBtn.style.display = enabled ? 'inline-block' : 'none';
-    this.elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
-    this.elements.clearBtn.style.display = enabled ? 'none' : 'inline-block';
+    Elm.hostBtn.style.display = enabled ? 'inline-block' : 'none';
+    Elm.joinBtn.style.display = enabled ? 'inline-block' : 'none';
+    Elm.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
+    Elm.clearBtn.style.display = enabled ? 'none' : 'inline-block';
 
     // キーワード入力のロック状態を更新（enabled=falseはセッション中を意味する）
     this.updateKeywordLockState(!enabled);
@@ -1060,8 +1115,8 @@ class UIManager {
   }
 
   adjustMobileAASize() {
-    const remoteAA = this.elements.remoteAA;
-    const localAA = this.elements.localAA;
+    const remoteAA = Elm.remoteAA;
+    const localAA = Elm.localAA;
 
     // 実際のDOM要素から利用可能高さを計算
     const h1 = document.querySelector('h1');
@@ -1129,28 +1184,28 @@ class UIManager {
   }
 
   openDeviceDialog() {
-    this.elements.deviceDialog.style.display = 'flex';
+    Elm.deviceDialog.style.display = 'flex';
   }
 
   closeDeviceDialog() {
-    this.elements.deviceDialog.style.display = 'none';
+    Elm.deviceDialog.style.display = 'none';
   }
 
   openHelpDialog() {
-    this.elements.helpDialog.style.display = 'flex';
+    Elm.helpDialog.style.display = 'flex';
   }
 
   closeHelpDialog() {
-    this.elements.helpDialog.style.display = 'none';
+    Elm.helpDialog.style.display = 'none';
   }
 
   loadKeywordFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const keyword = urlParams.get('k');
     if (keyword) {
-      this.elements.keyword.value = keyword;
+      Elm.keyword.value = keyword;
       this.isKeywordFromURL = true; // URL由来のキーワードフラグ
-      this.elements.clearBtn.style.display = 'inline-block'; // クリアボタン表示
+      Elm.clearBtn.style.display = 'inline-block'; // クリアボタン表示
       console.log('URLからキーワードを読み込み:', keyword);
     } else {
       this.isKeywordFromURL = false;
@@ -1163,7 +1218,7 @@ class UIManager {
     // セッション中（ホスト中・参加中）もロック
     // それ以外は編集可能
     const shouldLock = this.isKeywordFromURL || sessionActive;
-    this.elements.keyword.readOnly = shouldLock;
+    Elm.keyword.readOnly = shouldLock;
 
     console.log('キーワード入力状態:', shouldLock ? 'ロック' : '編集可能', {
       fromURL: this.isKeywordFromURL,
@@ -1177,47 +1232,16 @@ class UIManager {
 class AAChat {
   constructor() {
     // Initialize DOM elements
-    this.elements = {
-      keyword: document.getElementById('keyword'),
-      clearBtn: document.getElementById('clearBtn'),
-      hostBtn: document.getElementById('hostBtn'),
-      joinBtn: document.getElementById('joinBtn'),
-      leaveBtn: document.getElementById('leaveBtn'),
-      statusText: document.getElementById('statusText'),
-      timer: document.getElementById('timer'),
-      statusText2: document.getElementById('statusText2'),
-      timer2: document.getElementById('timer2'),
-      localVideo: document.getElementById('localVideo'),
-      remoteVideo: document.getElementById('remoteVideo'),
-      localAA: document.getElementById('localAA'),
-      remoteAA: document.getElementById('remoteAA'),
-      canvas: document.getElementById('canvas'),
-      videoSelect: document.getElementById('videoSelect'),
-      audioSelect: document.getElementById('audioSelect'),
-      refreshDevices: document.getElementById('refreshDevices'),
-      deviceBtn: document.getElementById('deviceBtn'),
-      mobileDeviceBtn: document.getElementById('mobileDeviceBtn'),
-      deviceDialog: document.getElementById('deviceDialog'),
-      closeDialog: document.getElementById('closeDialog'),
-      videoSelectDialog: document.getElementById('videoSelectDialog'),
-      audioSelectDialog: document.getElementById('audioSelectDialog'),
-      refreshDevicesDialog: document.getElementById('refreshDevicesDialog'),
-      applyDevices: document.getElementById('applyDevices'),
-      helpBtn: document.getElementById('helpBtn'),
-      helpDialog: document.getElementById('helpDialog'),
-      closeHelpDialog: document.getElementById('closeHelpDialog'),
-      mobileHelpBtn: document.getElementById('mobileHelpBtn')
-    };
 
     // Initialize managers
-    this.mediaManager = new MediaManager();
+    this.mediaManager = new MediaManager(this.elements);
     this.webRTCManager = new WebRTCManager();
     this.sessionManager = new SessionManager();
     this.signalingManager = new SignalingManager();
 
     // Initialize canvas and converters
-    this.ctx = this.elements.canvas.getContext('2d');
-    this.asciiConverter = new ASCIIConverter(this.elements.canvas, this.ctx);
+    this.ctx = Elm.canvas.getContext('2d');
+    this.asciiConverter = new ASCIIConverter(Elm.canvas, this.ctx);
     this.uiManager = new UIManager(this.elements);
 
     // State variables
@@ -1253,26 +1277,6 @@ const uiManager = aaChat.getUIManager();
 const elements = aaChat.getElements();
 const ctx = aaChat.ctx;
 
-// デバイス選択肢を更新
-function updateDeviceSelects() {
-  // デスクトップ用
-  updateSelectOptions(elements.videoSelect, mediaManager.getAvailableVideoDevices(), 'カメラ');
-  updateSelectOptions(elements.audioSelect, mediaManager.getAvailableAudioDevices(), 'マイク');
-
-  // ダイアログ用
-  updateSelectOptions(elements.videoSelectDialog, mediaManager.getAvailableVideoDevices(), 'カメラ');
-  updateSelectOptions(elements.audioSelectDialog, mediaManager.getAvailableAudioDevices(), 'マイク');
-
-  // 現在の選択を保持
-  if (mediaManager.selectedDeviceIds.video) {
-    elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
-    elements.videoSelectDialog.value = mediaManager.selectedDeviceIds.video;
-  }
-  if (mediaManager.selectedDeviceIds.audio) {
-    elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
-    elements.audioSelectDialog.value = mediaManager.selectedDeviceIds.audio;
-  }
-}
 
 function updateSelectOptions(selectElement, devices, prefix) {
   selectElement.innerHTML = '';
@@ -1343,7 +1347,7 @@ function addPollingInterval(intervalId) {
 
 
 async function hostSession() {
-  const keyword = elements.keyword.value.trim();
+  const keyword = Elm.keyword.value.trim();
   if (!keyword) {
     alert('キーワードを入力してください');
     return;
@@ -1356,7 +1360,7 @@ async function hostSession() {
   uiManager.toggleButtons(false);
 
   // ASCII変換を開始（ホスト開始時に必要）
-  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
 
   // セッショントークンは startSession で生成済み
 
@@ -1460,7 +1464,7 @@ async function restartHostSession() {
 }
 
 async function joinSession() {
-  const keyword = elements.keyword.value.trim();
+  const keyword = Elm.keyword.value.trim();
   if (!keyword) {
     alert('キーワードを入力してください');
     return;
@@ -1478,14 +1482,14 @@ async function joinSession() {
   uiManager.toggleButtons(false);
 
   // ASCII変換を再開（再参加時に必要）
-  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
 
   // シンプルにポーリングで検索
   startJoinPolling();
 }
 
 async function pollForAnswer() {
-  const keyword = elements.keyword.value;
+  const keyword = Elm.keyword.value;
   let attempts = 0;
   const maxAttempts = 30;
 
@@ -1583,7 +1587,7 @@ async function startJoinPolling() {
 }
 
 async function pollForIceCandidates() {
-  const keyword = sessionManager.currentKeyword || elements.keyword.value;
+  const keyword = sessionManager.currentKeyword || Elm.keyword.value;
   const targetKey = sessionManager.sessionToken ?
     `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'guest' : 'host'}` :
     `${keyword}-ice-${sessionManager.isHost ? 'guest' : 'host'}`;
@@ -1667,11 +1671,11 @@ function updateTimer() {
     const minutes = Math.floor(remaining / 60);
     const seconds = remaining % 60;
     const timerText = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-    elements.timer.textContent = timerText;
-    elements.timer2.textContent = timerText;
+    Elm.timer.textContent = timerText;
+    Elm.timer2.textContent = timerText;
   } else {
-    elements.timer.textContent = '';
-    elements.timer2.textContent = '';
+    Elm.timer.textContent = '';
+    Elm.timer2.textContent = '';
   }
 }
 
@@ -1684,8 +1688,8 @@ function clearKeywordTimer() {
     clearInterval(aaChat.timerInterval);
     aaChat.timerInterval = null;
   }
-  elements.timer.textContent = '';
-  elements.timer2.textContent = '';
+  Elm.timer.textContent = '';
+  Elm.timer2.textContent = '';
 }
 
 
@@ -1732,16 +1736,16 @@ function cleanup() {
   // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
   if (mediaManager.getLocalStream()) {
     mediaManager.stopCamera();
-    elements.localAA.textContent = '';
+    Elm.localAA.textContent = '';
     console.log('ローカルビデオストリーム停止');
   }
 
-  elements.remoteVideo.srcObject = null;
-  elements.remoteAA.textContent = '';
+  Elm.remoteVideo.srcObject = null;
+  Elm.remoteAA.textContent = '';
 
   // ホスト側でない場合のみローカルAAをクリア
   if (!sessionManager.isHost) {
-    elements.localAA.textContent = '';
+    Elm.localAA.textContent = '';
   }
 
   // iceCandidates now managed by webRTCManager
@@ -1762,8 +1766,8 @@ function cleanup() {
 }
 
 function updateStatus(text) {
-  elements.statusText.textContent = text;
-  elements.statusText2.textContent = text;
+  Elm.statusText.textContent = text;
+  Elm.statusText2.textContent = text;
 }
 
 async function getConnectionType() {
@@ -1819,33 +1823,33 @@ async function updateConnectionInfo(shouldUpdateStatus = false) {
   } else {
     // 詳細な接続情報を表示
     const info = `${connectionState} | ice: ${iceConnectionState} | gathering: ${iceGatheringState}`;
-    elements.timer.textContent = info;
-    elements.timer2.textContent = info;
+    Elm.timer.textContent = info;
+    Elm.timer2.textContent = info;
   }
 }
 
 // ユーザー操作によるビデオ再生を許可
 function enableAutoplayAfterUserGesture() {
   // すべてのビデオ要素で自動再生を試行
-  playVideoSafely(elements.localVideo, 'ローカル（ユーザー操作後）');
-  playVideoSafely(elements.remoteVideo, 'リモート（ユーザー操作後）');
+  playVideoSafely(Elm.localVideo, 'ローカル（ユーザー操作後）');
+  playVideoSafely(Elm.remoteVideo, 'リモート（ユーザー操作後）');
 }
 
-elements.hostBtn.addEventListener('click', () => {
+Elm.hostBtn.addEventListener('click', () => {
   enableAutoplayAfterUserGesture();
   hostSession();
 });
 
-elements.joinBtn.addEventListener('click', () => {
+Elm.joinBtn.addEventListener('click', () => {
   enableAutoplayAfterUserGesture();
   joinSession();
 });
 
-elements.leaveBtn.addEventListener('click', leaveSession);
+Elm.leaveBtn.addEventListener('click', leaveSession);
 
 // URLパラメータからキーワードを自動入力
 // クリアボタンのイベントリスナー
-elements.clearBtn.addEventListener('click', () => {
+Elm.clearBtn.addEventListener('click', () => {
   // パラメータなしのURLに遷移
   window.location.href = window.location.pathname;
 });
@@ -2005,16 +2009,16 @@ if (window.visualViewport) {
 
 // ダイアログ制御
 function openDeviceDialog() {
-  elements.deviceDialog.style.display = 'flex';
+  Elm.deviceDialog.style.display = 'flex';
 }
 
 function closeDeviceDialog() {
-  elements.deviceDialog.style.display = 'none';
+  Elm.deviceDialog.style.display = 'none';
 }
 
 async function applyDeviceSelection() {
-  const newVideoDeviceId = elements.videoSelectDialog.value;
-  const newAudioDeviceId = elements.audioSelectDialog.value;
+  const newVideoDeviceId = Elm.videoSelectDialog.value;
+  const newAudioDeviceId = Elm.audioSelectDialog.value;
 
   // デバイス変更があるかチェック
   const videoChanged = mediaManager.selectedDeviceIds.video !== newVideoDeviceId;
@@ -2030,12 +2034,12 @@ async function applyDeviceSelection() {
   mediaManager.selectedDeviceIds.audio = newAudioDeviceId;
 
   // デスクトップ用の選択も同期
-  elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
-  elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
+  Elm.videoSelect.value = mediaManager.selectedDeviceIds.video;
+  Elm.audioSelect.value = mediaManager.selectedDeviceIds.audio;
 
   console.log('デバイス選択適用:', {
-    video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
-    audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text,
+    video: Elm.videoSelectDialog.options[Elm.videoSelectDialog.selectedIndex]?.text,
+    audio: Elm.audioSelectDialog.options[Elm.audioSelectDialog.selectedIndex]?.text,
     sessionActive: sessionManager.sessionActive
   });
 
@@ -2053,49 +2057,49 @@ async function applyDeviceSelection() {
 }
 
 // イベントリスナー設定
-elements.deviceBtn.addEventListener('click', openDeviceDialog);
-elements.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
-elements.closeDialog.addEventListener('click', closeDeviceDialog);
-elements.applyDevices.addEventListener('click', applyDeviceSelection);
-elements.refreshDevices.addEventListener('click', () => mediaManager.getAvailableDevices());
-elements.refreshDevicesDialog.addEventListener('click', () => mediaManager.getAvailableDevices());
+Elm.deviceBtn.addEventListener('click', openDeviceDialog);
+Elm.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
+Elm.closeDialog.addEventListener('click', closeDeviceDialog);
+Elm.applyDevices.addEventListener('click', applyDeviceSelection);
+Elm.refreshDevices.addEventListener('click', () => mediaManager.getAvailableDevices());
+Elm.refreshDevicesDialog.addEventListener('click', () => mediaManager.getAvailableDevices());
 
 // ヘルプダイアログのイベントリスナー
-elements.helpBtn.addEventListener('click', () => {
-  elements.helpDialog.style.display = 'flex';
+Elm.helpBtn.addEventListener('click', () => {
+  Elm.helpDialog.style.display = 'flex';
 });
 
-elements.mobileHelpBtn.addEventListener('click', () => {
-  elements.helpDialog.style.display = 'flex';
+Elm.mobileHelpBtn.addEventListener('click', () => {
+  Elm.helpDialog.style.display = 'flex';
 });
 
-elements.closeHelpDialog.addEventListener('click', () => {
-  elements.helpDialog.style.display = 'none';
+Elm.closeHelpDialog.addEventListener('click', () => {
+  Elm.helpDialog.style.display = 'none';
 });
 
 // ヘルプダイアログ外側クリックで閉じる
-elements.helpDialog.addEventListener('click', (e) => {
-  if (e.target === elements.helpDialog) {
-    elements.helpDialog.style.display = 'none';
+Elm.helpDialog.addEventListener('click', (e) => {
+  if (e.target === Elm.helpDialog) {
+    Elm.helpDialog.style.display = 'none';
   }
 });
 
 // ダイアログ外クリックで閉じる
-elements.deviceDialog.addEventListener('click', (e) => {
-  if (e.target === elements.deviceDialog) {
+Elm.deviceDialog.addEventListener('click', (e) => {
+  if (e.target === Elm.deviceDialog) {
     closeDeviceDialog();
   }
 });
 
-elements.videoSelect.addEventListener('change', () => {
+Elm.videoSelect.addEventListener('change', () => {
   if (mediaManager.getLocalStream()) {
-    console.log('ビデオデバイス変更:', elements.videoSelect.options[elements.videoSelect.selectedIndex].text);
+    console.log('ビデオデバイス変更:', Elm.videoSelect.options[Elm.videoSelect.selectedIndex].text);
   }
 });
 
-elements.audioSelect.addEventListener('change', () => {
+Elm.audioSelect.addEventListener('change', () => {
   if (mediaManager.getLocalStream()) {
-    console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
+    console.log('音声デバイス変更:', Elm.audioSelect.options[Elm.audioSelect.selectedIndex].text);
   }
 });
 
@@ -2136,6 +2140,6 @@ if (window.visualViewport) {
 
 // ページ読み込み時に実行
 uiManager.loadKeywordFromURL();
-asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
 uiManager.adjustAAFontSize();
 mediaManager.getAvailableDevices();
