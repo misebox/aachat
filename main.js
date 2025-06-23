@@ -109,7 +109,7 @@ class Utility {
 
 // MediaManager class for device and stream management
 class MediaManager {
-  constructor(elements) {
+  constructor() {
     this.localStream = null;
     this.availableDevices = {
       videoDevices: [],
@@ -119,7 +119,6 @@ class MediaManager {
       video: null,
       audio: null
     };
-    this.elements = elements;
   }
 
   async getAvailableDevices() {
@@ -427,8 +426,7 @@ class WebRTCManager {
     this.iceGatheringTimeout = null;
   }
 
-  async createPeerConnection(elements) {
-    this.elements = elements; // elementsを保存
+  async createPeerConnection() {
     this.peerConnection = new RTCPeerConnection({
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
@@ -919,8 +917,7 @@ class ASCIIConverter {
 
 // UIManager class for DOM operations
 class UIManager {
-  constructor(elements) {
-    this.elements = elements;
+  constructor() {
     this.isKeywordFromURL = false; // URL由来のキーワードフラグ
   }
 
@@ -1231,10 +1228,8 @@ class UIManager {
 // AAChat Main Class - coordinates all managers
 class AAChat {
   constructor() {
-    // Initialize DOM elements
-
     // Initialize managers
-    this.mediaManager = new MediaManager(this.elements);
+    this.mediaManager = new MediaManager();
     this.webRTCManager = new WebRTCManager();
     this.sessionManager = new SessionManager();
     this.signalingManager = new SignalingManager();
@@ -1242,7 +1237,7 @@ class AAChat {
     // Initialize canvas and converters
     this.ctx = Elm.canvas.getContext('2d');
     this.asciiConverter = new ASCIIConverter(Elm.canvas, this.ctx);
-    this.uiManager = new UIManager(this.elements);
+    this.uiManager = new UIManager();
 
     // State variables
     this.keywordTimer = null;
@@ -1253,28 +1248,18 @@ class AAChat {
     this.activePollingIntervals = [];
     this.isWaitingForGuest = false;
   }
-
-  // Getter methods for backward compatibility
-  getMediaManager() { return this.mediaManager; }
-  getWebRTCManager() { return this.webRTCManager; }
-  getSessionManager() { return this.sessionManager; }
-  getSignalingManager() { return this.signalingManager; }
-  getASCIIConverter() { return this.asciiConverter; }
-  getUIManager() { return this.uiManager; }
-  getElements() { return this.elements; }
 }
 
 // Global instance
 const aaChat = new AAChat();
 
 // Backward compatibility - expose individual managers as globals
-const mediaManager = aaChat.getMediaManager();
-const webRTCManager = aaChat.getWebRTCManager();
-const sessionManager = aaChat.getSessionManager();
-const signalingManager = aaChat.getSignalingManager();
-const asciiConverter = aaChat.getASCIIConverter();
-const uiManager = aaChat.getUIManager();
-const elements = aaChat.getElements();
+const mediaManager = aaChat.mediaManager;
+const webRTCManager = aaChat.webRTCManager;
+const sessionManager = aaChat.sessionManager;
+const signalingManager = aaChat.signalingManager;
+const asciiConverter = aaChat.asciiConverter;
+const uiManager = aaChat.uiManager;
 const ctx = aaChat.ctx;
 
 
@@ -1364,7 +1349,7 @@ async function hostSession() {
 
   // セッショントークンは startSession で生成済み
 
-  await webRTCManager.createPeerConnection(elements);
+  await webRTCManager.createPeerConnection();
   webRTCManager.setupDataChannel();
 
   // オファー作成時のオプションを追加
@@ -1445,7 +1430,7 @@ async function restartHostSession() {
   }
 
   // 新しいセッションを開始
-  await webRTCManager.createPeerConnection(elements);
+  await webRTCManager.createPeerConnection();
   webRTCManager.setupDataChannel();
 
   const offer = await webRTCManager.createOffer();
@@ -1557,7 +1542,7 @@ async function startJoinPolling() {
           console.log('セッショントークン受信:', sessionManager.sessionToken);
         }
 
-        await webRTCManager.createPeerConnection(elements);
+        await webRTCManager.createPeerConnection();
         webRTCManager.setupDataChannel();
 
         await webRTCManager.setRemoteDescription(signal.offer);
