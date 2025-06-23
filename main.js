@@ -95,7 +95,10 @@ const elements = {
   videoSelectDialog: document.getElementById('videoSelectDialog'),
   audioSelectDialog: document.getElementById('audioSelectDialog'),
   refreshDevicesDialog: document.getElementById('refreshDevicesDialog'),
-  applyDevices: document.getElementById('applyDevices')
+  applyDevices: document.getElementById('applyDevices'),
+  helpBtn: document.getElementById('helpBtn'),
+  helpDialog: document.getElementById('helpDialog'),
+  closeHelpDialog: document.getElementById('closeHelpDialog')
 };
 
 const ctx = elements.canvas.getContext('2d');
@@ -1507,6 +1510,22 @@ async function createPeerConnection() {
   elements.applyDevices.addEventListener('click', applyDeviceSelection);
   elements.refreshDevices.addEventListener('click', getAvailableDevices);
   elements.refreshDevicesDialog.addEventListener('click', getAvailableDevices);
+  
+  // ヘルプダイアログのイベントリスナー
+  elements.helpBtn.addEventListener('click', () => {
+    elements.helpDialog.style.display = 'flex';
+  });
+  
+  elements.closeHelpDialog.addEventListener('click', () => {
+    elements.helpDialog.style.display = 'none';
+  });
+  
+  // ヘルプダイアログ外側クリックで閉じる
+  elements.helpDialog.addEventListener('click', (e) => {
+    if (e.target === elements.helpDialog) {
+      elements.helpDialog.style.display = 'none';
+    }
+  });
   
   // ダイアログ外クリックで閉じる
   elements.deviceDialog.addEventListener('click', (e) => {

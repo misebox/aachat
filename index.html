@@ -21,6 +21,51 @@
             </div>
         </div>
         
+        <!-- ヘルプダイアログ -->
+        <div id="helpDialog" class="help-dialog" style="display: none;">
+            <div class="dialog-content">
+                <div class="dialog-header">
+                    <h3>使い方</h3>
+                    <button id="closeHelpDialog">×</button>
+                </div>
+                <div class="dialog-body help-body">
+                    <h4>AA電話とは</h4>
+                    <p>ビデオをASCIIアート（文字）に変換してリアルタイムで通話するアプリです。</p>
+                    <p>同じキーワードを入力した人と接続できます。</p>
+                    
+                    <h4>通話を始める</h4>
+                    <ol>
+                        <li><strong>ホスト側：</strong>
+                            <ul>
+                                <li>キーワードを入力（または自動生成されたものを使用）</li>
+                                <li>「ホストする」ボタンをクリック</li>
+                                <li>相手にキーワードを伝える</li>
+                            </ul>
+                        </li>
+                        <li><strong>ゲスト側：</strong>
+                            <ul>
+                                <li>ホストから聞いたキーワードを入力</li>
+                                <li>「参加する」ボタンをクリック</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <h4>注意事項</h4>
+                    <ul>
+                        <li>ゲストは10分以内に参加する必要があります</li>
+                        <li>カメラとマイクの使用許可が必要です</li>
+                        <li>キーワードは他の人に推測されにくいものを使用してください</li>
+                    </ul>
+                    
+                    <h4>デバイス設定</h4>
+                    <p>⚙️ボタンでカメラとマイクを切り替えられます（通話中も可能）</p>
+                    <p style="text-align: center; margin-top: 20px; font-size: 0.8em;">
+                       © misebox 2025.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
         <!-- デバイス選択ダイアログ -->
         <div id="deviceDialog" class="device-dialog" style="display: none;">
             <div class="dialog-content">
@@ -51,6 +96,7 @@
             <button id="hostBtn">ホストする</button>
             <button id="joinBtn">参加する</button>
             <button id="deviceBtn" class="device-button desktop-device-btn">⚙️</button>
+            <button id="helpBtn" class="help-button">?</button>
             <button id="leaveBtn" style="display: none;">退室</button>
         </div>
         
