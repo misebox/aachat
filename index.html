@@ -2,15 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AA電話</title>
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>AA電話</h1>
+    <div id="container" class="container">
+        <h1 id="title">AA電話</h1>
         
-        <div class="device-controls">
+        <div id="deviceControls" class="device-controls">
             <button id="mobileDeviceBtn" class="device-button mobile-device-btn">⚙️</button>
             <button id="mobileHelpBtn" class="mobile-help-btn">?</button>
             <div class="device-row desktop-only">
@@ -94,7 +94,7 @@
             </div>
         </div>
         
-        <div class="controls">
+        <div id="controls" class="controls">
             <input type="text" id="keyword" placeholder="キーワードを入力">
             <button id="clearBtn" style="display: none;">クリア</button>
             <button id="hostBtn">ホスト</button>
@@ -104,25 +104,25 @@
             <button id="leaveBtn" style="display: none;">退室</button>
         </div>
         
-        <div class="status desktop-status">
+        <div id="desktopStatus" class="status desktop-status">
             <span id="statusText">未接続</span>
             <span id="timer"></span>
         </div>
         
-        <div class="chat-area">
+        <div id="chatArea" class="chat-area">
             <div class="video-container">
-                <h3>相手</h3>
+                <h3 id="remoteTitle">相手</h3>
                 <pre id="remoteAA" class="aa-display"></pre>
                 <video id="remoteVideo" autoplay style="display: none;"></video>
             </div>
             
-            <div class="status mobile-status">
+            <div id="mobileStatus" class="status mobile-status">
                 <span id="statusText2">未接続</span>
                 <span id="timer2"></span>
             </div>
             
             <div class="video-container">
-                <h3>自分</h3>
+                <h3 id="localTitle">自分</h3>
                 <pre id="localAA" class="aa-display"></pre>
                 <video id="localVideo" autoplay muted style="display: none;"></video>
             </div>
