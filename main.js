@@ -98,7 +98,8 @@ const elements = {
   applyDevices: document.getElementById('applyDevices'),
   helpBtn: document.getElementById('helpBtn'),
   helpDialog: document.getElementById('helpDialog'),
-  closeHelpDialog: document.getElementById('closeHelpDialog')
+  closeHelpDialog: document.getElementById('closeHelpDialog'),
+  mobileHelpBtn: document.getElementById('mobileHelpBtn')
 };
 
 const ctx = elements.canvas.getContext('2d');
@@ -1513,6 +1514,10 @@ async function createPeerConnection() {
   
   // ヘルプダイアログのイベントリスナー
   elements.helpBtn.addEventListener('click', () => {
+    elements.helpDialog.style.display = 'flex';
+  });
+
+  elements.mobileHelpBtn.addEventListener('click', () => {
     elements.helpDialog.style.display = 'flex';
   });
   

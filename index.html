@@ -12,6 +12,7 @@
         
         <div class="device-controls">
             <button id="mobileDeviceBtn" class="device-button mobile-device-btn">⚙️</button>
+            <button id="mobileHelpBtn" class="help-button mobile-help-btn">?</button>
             <div class="device-row desktop-only">
                 <label for="videoSelect">ビデオ:</label>
                 <select id="videoSelect"></select>
@@ -38,14 +39,17 @@
                         <li><strong>ホスト側：</strong>
                             <ul>
                                 <li>キーワードを入力（または自動生成されたものを使用）</li>
-                                <li>「ホストする」ボタンをクリック</li>
+                                <li>「ホスト」ボタンをクリック</li>
                                 <li>相手にキーワードを伝える</li>
+                                <li>退室ボタンをクリックして通話を終了</li>
                             </ul>
                         </li>
                         <li><strong>ゲスト側：</strong>
                             <ul>
                                 <li>ホストから聞いたキーワードを入力</li>
-                                <li>「参加する」ボタンをクリック</li>
+                                <li>「参加」ボタンをクリック</li>
+                                <li>退室ボタンをクリックして通話を終了</li>
+                                <li>ゲストは退室後に再度参加できます</li>
                             </ul>
                         </li>
                     </ol>
@@ -93,8 +97,8 @@
         <div class="controls">
             <input type="text" id="keyword" placeholder="キーワードを入力">
             <button id="clearBtn" style="display: none;">クリア</button>
-            <button id="hostBtn">ホストする</button>
-            <button id="joinBtn">参加する</button>
+            <button id="hostBtn">ホスト</button>
+            <button id="joinBtn">参加</button>
             <button id="deviceBtn" class="device-button desktop-device-btn">⚙️</button>
             <button id="helpBtn" class="help-button">?</button>
             <button id="leaveBtn" style="display: none;">退室</button>
