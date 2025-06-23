@@ -810,6 +810,7 @@ class ASCIIConverter {
     this.dynamicRangeEnabled = true;
     this.contrastTimer = null;
     this.conversionTimer = null;
+    this.lastRemoteVideoLogTime = 0;
   }
 
   videoToAscii(video) {
@@ -940,15 +941,17 @@ class ASCIIConverter {
       if (remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
         const remoteAAText = this.videoToAscii(remoteVideo);
         remoteAA.textContent = remoteAAText;
-      } else if (remoteVideo.srcObject) {
-        // リモートビデオがあるがサイズが0の場合のログ
-        if (remoteVideo.videoWidth === 0) {
+      } else if (remoteVideo.srcObject && remoteVideo.videoWidth === 0) {
+        // リモートビデオがあるがサイズが0の場合のログ（5秒間隔で制限）
+        const now = Date.now();
+        if (now - this.lastRemoteVideoLogTime > 5000) {
           console.log('Remote video has stream but no dimensions:', {
             readyState: remoteVideo.readyState,
             paused: remoteVideo.paused,
             videoWidth: remoteVideo.videoWidth,
             videoHeight: remoteVideo.videoHeight
           });
+          this.lastRemoteVideoLogTime = now;
         }
       }
     }, 16); // 約60fps
@@ -985,7 +988,16 @@ class UIManager {
     Elm.hostBtn.style.display = enabled ? 'inline-block' : 'none';
     Elm.joinBtn.style.display = enabled ? 'inline-block' : 'none';
     Elm.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
-    Elm.clearBtn.style.display = enabled ? 'none' : 'inline-block';
+    
+    // クリアボタンはセッション中（enabled=false）には非表示
+    if (!enabled) {
+      Elm.clearBtn.style.display = 'none';
+    } else {
+      // セッション終了時は、URL由来のキーワードがある場合のみ表示
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasKeywordFromURL = urlParams.get('k');
+      Elm.clearBtn.style.display = hasKeywordFromURL ? 'inline-block' : 'none';
+    }
 
     // キーワード入力のロック状態を更新（enabled=falseはセッション中を意味する）
     this.updateKeywordLockState(!enabled);
