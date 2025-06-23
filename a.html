@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ASCII Gradient</title>
+<style>
+  body { margin: 0; background: #111; color: #fff; }
+  pre  { margin: 0; font: 8px/8px "Courier New", monospace; white-space: pre; line-height: 0.9; }
+</style>
+</head>
+<body>
+<pre id="grad"></pre>
+
+<script>
+const palette = " .,:;ico%k0S@QNW";
+const width   = 80;          // 1行あたりの文字数
+const height  = 3;           // 行数（2行）
+const steps   = palette.length;
+
+const out = [];
+
+for (let s = 0; s < steps; s++) {
+  const ch = palette[s];
+  const line = ch.repeat(width);
+  for (let h = 0; h < height; h++) out.push(line);
+}
+
+document.getElementById('grad').textContent = out.join('\n');
+</script>
+</body>
+</html>
+

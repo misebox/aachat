@@ -20,7 +20,8 @@ class Config {
 
   // ASCII文字セット（明度順、暗→明）
   static get ASCII_CHARS() {
-    return ' .`\'"-:;!l/tfjrxnvcXYUJ0ZMKG8#@$';
+    // return " .`',-~:^!+;=7i*r>zvcoxs&kCDZ0X%S$#8@NQW";
+    return " .,:;ico%k0S@QNW";
   }
 
   static get CHAR_COUNT() {
