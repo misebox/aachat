@@ -373,6 +373,7 @@ class WebRTCManager {
   }
 
   async createPeerConnection(elements) {
+    this.elements = elements; // elementsを保存
     this.peerConnection = new RTCPeerConnection({ 
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
@@ -407,12 +408,12 @@ class WebRTCManager {
     
     this.peerConnection.ontrack = (event) => {
       console.log('リモートトラック受信:', event.track.kind);
-      elements.remoteVideo.srcObject = event.streams[0];
-      elements.remoteVideo.onloadedmetadata = () => {
-        console.log('リモートビデオサイズ:', elements.remoteVideo.videoWidth, 'x', elements.remoteVideo.videoHeight);
+      this.elements.remoteVideo.srcObject = event.streams[0];
+      this.elements.remoteVideo.onloadedmetadata = () => {
+        console.log('リモートビデオサイズ:', this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
       };
       // リモートビデオの適切な再生処理
-      playVideoSafely(elements.remoteVideo, 'リモート');
+      playVideoSafely(this.elements.remoteVideo, 'リモート');
     };
     
     this.peerConnection.onicecandidate = async (event) => {
@@ -815,6 +816,7 @@ class ASCIIConverter {
 class UIManager {
   constructor(elements) {
     this.elements = elements;
+    this.isKeywordFromURL = false; // URL由来のキーワードフラグ
   }
 
   updateStatus(text) {
@@ -827,10 +829,12 @@ class UIManager {
     this.elements.joinBtn.disabled = !enabled;
     this.elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
     this.elements.clearBtn.style.display = enabled ? 'none' : 'inline-block';
+    
+    // キーワード入力のロック状態を更新（enabled=falseはセッション中を意味する）
+    this.updateKeywordLockState(!enabled);
   }
 
   adjustAAFontSize() {
-    const aaDisplays = document.querySelectorAll('.aa-display');
     const containerWidth = window.innerWidth;
     const containerHeight = window.innerHeight;
     
@@ -840,51 +844,234 @@ class UIManager {
       return;
     }
     
-    // デスクトップの場合
-    let optimalFontSize = 10;
-    
-    // 画面サイズに基づいて基本フォントサイズを計算
-    if (containerWidth >= 1920) {
-      optimalFontSize = Math.min(14, containerHeight / 60);
-    } else if (containerWidth >= 1366) {
-      optimalFontSize = Math.min(12, containerHeight / 65);
-    } else if (containerWidth >= 1024) {
-      optimalFontSize = Math.min(10, containerHeight / 70);
-    } else {
-      optimalFontSize = Math.min(8, containerHeight / 75);
+    // タブレットの場合は画面に収まるように調整
+    if (containerWidth <= 1200) {
+      // 縦向きか横向きかを判定
+      const isPortrait = containerHeight > containerWidth;
+      
+      let availableWidth, availableHeight, fontSizeByWidth, fontSizeByHeight;
+      
+      if (isPortrait) {
+        // 縦向きタブレット：縦並びレイアウト
+        availableWidth = containerWidth - 40; // 1つのAAエリア + マージン
+        availableHeight = (containerHeight - 160) / 2; // 2つのAAエリア + コントロール
+        fontSizeByWidth = availableWidth / (80 * 0.6 + 79 * 0.4);
+        fontSizeByHeight = availableHeight / 60;
+      } else {
+        // 横向きタブレット：横並びレイアウト
+        availableWidth = (containerWidth - 60) / 2; // 2つのAAエリア + マージン
+        availableHeight = containerHeight - 120; // コントロール分を除く
+        fontSizeByWidth = availableWidth / (80 * 0.6 + 79 * 0.4);
+        fontSizeByHeight = availableHeight / 60;
+      }
+      
+      const tabletFontSize = Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
+      document.documentElement.style.setProperty('--aa-font-size', `${tabletFontSize}px`);
+      console.log('タブレットAAサイズ調整:', tabletFontSize + 'px', {
+        isPortrait,
+        availableWidth,
+        availableHeight,
+        fontSizeByWidth,
+        fontSizeByHeight
+      });
+      return;
     }
     
-    // 最小・最大値の制限
-    optimalFontSize = Math.max(6, Math.min(16, optimalFontSize));
+    // デスクトップの場合は実際のコンテナサイズを計算
+    const chatArea = document.querySelector('.chat-area');
+    
+    // 実際に使用されているスペースを計算
+    const h1 = document.querySelector('h1');
+    const controls = document.querySelector('.controls');
+    const desktopStatus = document.querySelector('.desktop-status');
+    const container = document.querySelector('.container');
+    
+    let usedHeight = 0;
+    if (h1) usedHeight += h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom);
+    if (controls) usedHeight += controls.offsetHeight + parseInt(getComputedStyle(controls).marginTop) + parseInt(getComputedStyle(controls).marginBottom);
+    if (desktopStatus) usedHeight += desktopStatus.offsetHeight + parseInt(getComputedStyle(desktopStatus).marginTop) + parseInt(getComputedStyle(desktopStatus).marginBottom);
+    if (container) {
+      const containerPadding = parseInt(getComputedStyle(container).paddingTop) + parseInt(getComputedStyle(container).paddingBottom);
+      usedHeight += containerPadding;
+    }
+    
+    const actualChatAreaHeight = containerHeight - usedHeight;
+    const actualChatAreaWidth = chatArea ? chatArea.clientWidth : containerWidth - 20;
+    
+    let fontSize;
+    
+    if (containerWidth > 1200) {
+      // 横並びレイアウト - 2つのAAエリアが横に並ぶ
+      // CSSのgapサイズを動的に取得
+      const chatAreaStyles = getComputedStyle(chatArea);
+      const gapSize = parseInt(chatAreaStyles.gap) || 0;
+      const availableWidthPerArea = (actualChatAreaWidth - gapSize) / 2;
+      
+      // video-container内でのh3タイトルの実際の高さを取得
+      const sampleH3 = document.querySelector('.video-container h3');
+      const titleHeight = sampleH3 ? sampleH3.offsetHeight : 0;
+      const availableHeightPerArea = actualChatAreaHeight - titleHeight;
+      
+      // CSS width formula: calc(80 * fontSize * 0.6 + 79 * fontSize * 0.4)
+      const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
+      const fontSizeByWidth = availableWidthPerArea / widthMultiplier;
+      const fontSizeByHeight = availableHeightPerArea / 60;
+      
+      fontSize = Math.min(fontSizeByWidth, fontSizeByHeight, 20);
+    } else {
+      // 縦並びレイアウト - AAエリアが縦に並ぶ
+      const availableWidth = actualChatAreaWidth;
+      
+      // 実際のDOM要素のサイズを取得
+      const mobileStatus = document.querySelector('.mobile-status');
+      const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
+      
+      // h3タイトル要素の実際の高さを取得（2つ分）
+      const h3Elements = document.querySelectorAll('.video-container h3');
+      let totalTitleHeight = 0;
+      h3Elements.forEach(h3 => {
+        if (h3) totalTitleHeight += h3.offsetHeight;
+      });
+      
+      const availableHeightPerArea = (actualChatAreaHeight - mobileStatusHeight - totalTitleHeight) / 2;
+      
+      const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
+      const fontSizeByWidth = availableWidth / widthMultiplier;
+      const fontSizeByHeight = availableHeightPerArea / 60;
+      
+      fontSize = Math.min(fontSizeByWidth, fontSizeByHeight, 18);
+    }
+    
+    fontSize = Math.max(fontSize, 8); // 最小8px
+    
+    // CSSカスタムプロパティで動的に設定
+    document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
+    
+    // 設定後に実際のサイズを検証して調整
+    setTimeout(() => {
+      this.validateAndAdjustAASize(fontSize);
+    }, 100);
+    
+    console.log('AA表示フォントサイズ調整:', fontSize + 'px', {
+      containerWidth,
+      containerHeight,
+      actualChatAreaWidth,
+      actualChatAreaHeight,
+      layout: containerWidth > 1200 ? '横並び' : '縦並び'
+    });
+  }
+
+  validateAndAdjustAASize(initialFontSize) {
+    const aaDisplays = document.querySelectorAll('.aa-display');
+    const chatArea = document.querySelector('.chat-area');
+    
+    if (!chatArea || aaDisplays.length === 0) return;
+    
+    const chatAreaRect = chatArea.getBoundingClientRect();
+    let needsAdjustment = false;
+    let adjustmentFactor = 1.0;
     
     aaDisplays.forEach(display => {
-      display.style.setProperty('--aa-font-size', `${optimalFontSize}px`);
+      const rect = display.getBoundingClientRect();
+      
+      // 幅のはみ出しチェック
+      if (rect.width > chatAreaRect.width) {
+        const widthFactor = (chatAreaRect.width - 20) / rect.width; // 20px マージン
+        adjustmentFactor = Math.min(adjustmentFactor, widthFactor);
+        needsAdjustment = true;
+        console.log('幅はみ出し検出:', rect.width, '>', chatAreaRect.width);
+      }
+      
+      // 高さのはみ出しチェック（親コンテナとの比較）
+      const container = display.closest('.video-container');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const titleHeight = 30; // h3タイトル分
+        const availableHeight = containerRect.height - titleHeight;
+        
+        if (rect.height > availableHeight) {
+          const heightFactor = availableHeight / rect.height;
+          adjustmentFactor = Math.min(adjustmentFactor, heightFactor);
+          needsAdjustment = true;
+          console.log('高さはみ出し検出:', rect.height, '>', availableHeight);
+        }
+      }
     });
+    
+    if (needsAdjustment) {
+      const adjustedFontSize = Math.max(initialFontSize * adjustmentFactor, 6);
+      document.documentElement.style.setProperty('--aa-font-size', `${adjustedFontSize}px`);
+      console.log('AAサイズ再調整:', initialFontSize + 'px', '->', adjustedFontSize + 'px', '調整係数:', adjustmentFactor);
+    }
   }
 
   adjustMobileAASize() {
     const remoteAA = this.elements.remoteAA;
     const localAA = this.elements.localAA;
     
-    // 利用可能な高さを計算
-    const viewportHeight = window.innerHeight;
-    const controlsHeight = 60;
-    const statusHeight = 40;
-    const availableHeight = viewportHeight - controlsHeight - statusHeight;
+    // 実際のDOM要素から利用可能高さを計算
+    const h1 = document.querySelector('h1');
+    const controls = document.querySelector('.controls');
+    const container = document.querySelector('.container');
     
-    // リモート（相手）用のフォントサイズ（優先的に大きく）
-    const remoteTargetHeight = Math.min(availableHeight * 0.6, 400);
-    let remoteFontSize = Math.floor(remoteTargetHeight / 60);
-    remoteFontSize = Math.max(4, Math.min(12, remoteFontSize));
+    const h1Height = h1 ? h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom) : 0;
+    const controlsHeight = controls ? controls.offsetHeight : 0;
+    const containerPadding = container ? parseInt(getComputedStyle(container).paddingTop) + parseInt(getComputedStyle(container).paddingBottom) : 0;
     
-    // ローカル（自分）用のフォントサイズ（残りスペース）
-    const localTargetHeight = availableHeight - remoteTargetHeight - 20;
-    let localFontSize = Math.floor(localTargetHeight / 60);
-    localFontSize = Math.max(3, Math.min(8, localFontSize));
+    // Visual Viewport API対応（iOS キーボード表示時）
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const availableHeight = viewportHeight - h1Height - controlsHeight - containerPadding;
     
-    // CSS変数を設定
-    remoteAA.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
-    localAA.style.setProperty('--aa-font-size', `${localFontSize}px`);
+    // chat-area内の要素（mobile-status、h3タイトル）を考慮
+    const mobileStatus = document.querySelector('.mobile-status');
+    const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
+    
+    const h3Elements = document.querySelectorAll('.video-container h3');
+    let totalTitleHeight = 0;
+    h3Elements.forEach(h3 => {
+      if (h3) totalTitleHeight += h3.offsetHeight;
+    });
+    
+    const availableAAHeight = availableHeight - mobileStatusHeight - totalTitleHeight;
+    
+    // より大胆なサイズ計算を試す
+    const idealFontSize = availableAAHeight / (60 * 2.5); // 2.5倍で計算（2つのAAエリア分）
+    
+    // 幅の制約もチェック
+    const containerWidth = window.innerWidth;
+    const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
+    const maxFontSizeByWidth = (containerWidth - 10) / widthMultiplier; // 10px マージン
+    
+    // 最終的なフォントサイズ
+    let fontSize = Math.min(idealFontSize, maxFontSizeByWidth);
+    fontSize = Math.max(4, Math.min(12, fontSize)); // 4-12pxの範囲（モバイル用に制限）
+    
+    console.log('モバイルAAサイズ計算:', {
+      viewportHeight,
+      h1Height,
+      controlsHeight,
+      containerPadding,
+      availableHeight,
+      availableAAHeight,
+      fontSize
+    });
+    
+    
+    // CSS変数を設定（両方同じサイズ）
+    document.documentElement.style.setProperty('--remote-aa-font-size', `${fontSize}px`);
+    document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
+      
+    console.log('モバイルAAサイズ調整:', fontSize + 'px', {
+      availableHeight,
+      availableAAHeight,
+      idealFontSize,
+      maxFontSizeByWidth,
+      mobileStatusHeight,
+      totalTitleHeight,
+      containerWidth,
+      finalFontSize: fontSize,
+      calculatedAAHeight: fontSize * 60 * 2
+    });
   }
 
   openDeviceDialog() {
@@ -908,10 +1095,26 @@ class UIManager {
     const keyword = urlParams.get('k');
     if (keyword) {
       this.elements.keyword.value = keyword;
-      this.elements.keyword.readOnly = true; // 編集不可に設定
+      this.isKeywordFromURL = true; // URL由来のキーワードフラグ
       this.elements.clearBtn.style.display = 'inline-block'; // クリアボタン表示
       console.log('URLからキーワードを読み込み:', keyword);
+    } else {
+      this.isKeywordFromURL = false;
     }
+    this.updateKeywordLockState(false); // 初期状態（セッション非アクティブ）で更新
+  }
+
+  updateKeywordLockState(sessionActive) {
+    // k=パラメータ指定時は常にロック
+    // セッション中（ホスト中・参加中）もロック
+    // それ以外は編集可能
+    const shouldLock = this.isKeywordFromURL || sessionActive;
+    this.elements.keyword.readOnly = shouldLock;
+    
+    console.log('キーワード入力状態:', shouldLock ? 'ロック' : '編集可能', {
+      fromURL: this.isKeywordFromURL,
+      sessionActive: sessionActive
+    });
   }
 }
 
@@ -922,6 +1125,7 @@ const webRTCManager = new WebRTCManager();
 const sessionManager = new SessionManager();
 const signalingManager = new SignalingManager();
 let keywordTimer = null;
+let timerInterval = null;
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let reconnectInterval = null;
@@ -1342,9 +1546,10 @@ function addPollingInterval(intervalId) {
       }
     }, 10 * 60 * 1000);
     
-    const timerInterval = setInterval(() => {
+    timerInterval = setInterval(() => {
       if (!sessionManager.startTime) {
         clearInterval(timerInterval);
+        timerInterval = null;
         return;
       }
       updateTimer();
@@ -1373,6 +1578,10 @@ function addPollingInterval(intervalId) {
     if (keywordTimer) {
       clearTimeout(keywordTimer);
       keywordTimer = null;
+    }
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
     }
     elements.timer.textContent = '';
     elements.timer2.textContent = '';
@@ -1514,13 +1723,6 @@ function addPollingInterval(intervalId) {
     }
   }
   
-  function toggleButtons(enabled) {
-    elements.hostBtn.style.display = enabled ? 'inline-block' : 'none';
-    elements.joinBtn.style.display = enabled ? 'inline-block' : 'none';
-    elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
-    elements.keyword.disabled = !enabled;
-  }
-  
   // ユーザー操作によるビデオ再生を許可
   function enableAutoplayAfterUserGesture() {
     // すべてのビデオ要素で自動再生を試行
@@ -1541,17 +1743,6 @@ function addPollingInterval(intervalId) {
   elements.leaveBtn.addEventListener('click', leaveSession);
   
   // URLパラメータからキーワードを自動入力
-  function loadKeywordFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const keyword = urlParams.get('k');
-    if (keyword) {
-      elements.keyword.value = keyword;
-      elements.keyword.readOnly = true; // 編集不可に設定
-      elements.clearBtn.style.display = 'inline-block'; // クリアボタン表示
-      console.log('URLからキーワードを読み込み:', keyword);
-    }
-  }
-  
   // クリアボタンのイベントリスナー
   elements.clearBtn.addEventListener('click', () => {
     // パラメータなしのURLに遷移
@@ -1806,6 +1997,41 @@ function addPollingInterval(intervalId) {
       console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
     }
   });
+  
+  // iOS キーボード対策
+  if (window.visualViewport) {
+    let initialViewportHeight = window.visualViewport.height;
+    let keyboardVisible = false;
+    
+    window.visualViewport.addEventListener('resize', () => {
+      const currentHeight = window.visualViewport.height;
+      const heightDifference = initialViewportHeight - currentHeight;
+      
+      // キーボード表示判定（高さが大幅に減った場合）
+      const wasKeyboardVisible = keyboardVisible;
+      keyboardVisible = heightDifference > 150; // 150px以上減った場合
+      
+      // キーボードが非表示になった時
+      if (wasKeyboardVisible && !keyboardVisible) {
+        // ズームリセット
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          // viewportを強制リセット
+          const viewport = document.querySelector('meta[name=viewport]');
+          if (viewport) {
+            viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+          }
+        }, 100);
+      }
+      
+      // AAサイズも再調整
+      if (!keyboardVisible) {
+        setTimeout(() => {
+          uiManager.adjustAAFontSize();
+        }, 200);
+      }
+    });
+  }
   
   // ページ読み込み時に実行
   uiManager.loadKeywordFromURL();
