@@ -37,6 +37,7 @@ class Config {
 }
 
 const _byId = (id) => document.getElementById(id);
+
 const Elm = {
   keyword: _byId('keyword'),
   clearBtn: _byId('clearBtn'),
@@ -66,7 +67,17 @@ const Elm = {
   helpBtn: _byId('helpBtn'),
   helpDialog: _byId('helpDialog'),
   closeHelpDialog: _byId('closeHelpDialog'),
-  mobileHelpBtn: _byId('mobileHelpBtn')
+  mobileHelpBtn: _byId('mobileHelpBtn'),
+  // ID-based elements added to HTML
+  container: _byId('container'),
+  title: _byId('title'),
+  controls: _byId('controls'),
+  desktopStatus: _byId('desktopStatus'),
+  chatArea: _byId('chatArea'),
+  mobileStatus: _byId('mobileStatus'),
+  remoteTitle: _byId('remoteTitle'),
+  localTitle: _byId('localTitle'),
+  viewport: _byId('viewport')
 };
 
 
@@ -366,6 +377,46 @@ class MediaManager {
 
   getAvailableAudioDevices() {
     return this.availableDevices.audioDevices;
+  }
+
+  async applyDeviceSelection(sessionManager, webRTCManager, closeDialogCallback) {
+    const newVideoDeviceId = Elm.videoSelectDialog.value;
+    const newAudioDeviceId = Elm.audioSelectDialog.value;
+
+    // デバイス変更があるかチェック
+    const videoChanged = this.selectedDeviceIds.video !== newVideoDeviceId;
+    const audioChanged = this.selectedDeviceIds.audio !== newAudioDeviceId;
+
+    if (!videoChanged && !audioChanged) {
+      closeDialogCallback();
+      return;
+    }
+
+    // 選択デバイスIDを更新
+    this.selectedDeviceIds.video = newVideoDeviceId;
+    this.selectedDeviceIds.audio = newAudioDeviceId;
+
+    // デスクトップ用の選択も同期
+    Elm.videoSelect.value = this.selectedDeviceIds.video;
+    Elm.audioSelect.value = this.selectedDeviceIds.audio;
+
+    console.log('デバイス選択適用:', {
+      video: Elm.videoSelectDialog.options[Elm.videoSelectDialog.selectedIndex]?.text,
+      audio: Elm.audioSelectDialog.options[Elm.audioSelectDialog.selectedIndex]?.text,
+      sessionActive: sessionManager.sessionActive
+    });
+
+    // 通話中の場合はデバイスを切り替え
+    if (sessionManager.sessionActive && this.getLocalStream() && webRTCManager.getPeerConnection()) {
+      try {
+        await this.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
+      } catch (error) {
+        console.error('通話中のデバイス切り替えエラー:', error);
+        alert('デバイスの切り替えに失敗しました: ' + error.message);
+      }
+    }
+
+    closeDialogCallback();
   }
 }
 
@@ -984,13 +1035,13 @@ class UIManager {
     }
 
     // デスクトップの場合は実際のコンテナサイズを計算
-    const chatArea = document.querySelector('.chat-area');
+    const chatArea = Elm.chatArea;
 
     // 実際に使用されているスペースを計算
-    const h1 = document.querySelector('h1');
-    const controls = document.querySelector('.controls');
-    const desktopStatus = document.querySelector('.desktop-status');
-    const container = document.querySelector('.container');
+    const h1 = Elm.title;
+    const controls = Elm.controls;
+    const desktopStatus = Elm.desktopStatus;
+    const container = Elm.container;
 
     let usedHeight = 0;
     if (h1) usedHeight += h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom);
@@ -1014,7 +1065,7 @@ class UIManager {
       const availableWidthPerArea = (actualChatAreaWidth - gapSize) / 2;
 
       // video-container内でのh3タイトルの実際の高さを取得
-      const sampleH3 = document.querySelector('.video-container h3');
+      const sampleH3 = Elm.remoteTitle;
       const titleHeight = sampleH3 ? sampleH3.offsetHeight : 0;
       const availableHeightPerArea = actualChatAreaHeight - titleHeight;
 
@@ -1029,11 +1080,11 @@ class UIManager {
       const availableWidth = actualChatAreaWidth;
 
       // 実際のDOM要素のサイズを取得
-      const mobileStatus = document.querySelector('.mobile-status');
+      const mobileStatus = Elm.mobileStatus;
       const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
 
       // h3タイトル要素の実際の高さを取得（2つ分）
-      const h3Elements = document.querySelectorAll('.video-container h3');
+      const h3Elements = [Elm.remoteTitle, Elm.localTitle];
       let totalTitleHeight = 0;
       h3Elements.forEach(h3 => {
         if (h3) totalTitleHeight += h3.offsetHeight;
@@ -1068,8 +1119,8 @@ class UIManager {
   }
 
   validateAndAdjustAASize(initialFontSize) {
-    const aaDisplays = document.querySelectorAll('.aa-display');
-    const chatArea = document.querySelector('.chat-area');
+    const aaDisplays = [Elm.localAA, Elm.remoteAA];
+    const chatArea = Elm.chatArea;
 
     if (!chatArea || aaDisplays.length === 0) return;
 
@@ -1116,9 +1167,9 @@ class UIManager {
     const localAA = Elm.localAA;
 
     // 実際のDOM要素から利用可能高さを計算
-    const h1 = document.querySelector('h1');
-    const controls = document.querySelector('.controls');
-    const container = document.querySelector('.container');
+    const h1 = Elm.title;
+    const controls = Elm.controls;
+    const container = Elm.container;
 
     const h1Height = h1 ? h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom) : 0;
     const controlsHeight = controls ? controls.offsetHeight : 0;
@@ -1129,10 +1180,10 @@ class UIManager {
     const availableHeight = viewportHeight - h1Height - controlsHeight - containerPadding;
 
     // chat-area内の要素（mobile-status、h3タイトル）を考慮
-    const mobileStatus = document.querySelector('.mobile-status');
+    const mobileStatus = Elm.mobileStatus;
     const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
 
-    const h3Elements = document.querySelectorAll('.video-container h3');
+    const h3Elements = [Elm.remoteTitle, Elm.localTitle];
     let totalTitleHeight = 0;
     h3Elements.forEach(h3 => {
       if (h3) totalTitleHeight += h3.offsetHeight;
@@ -1841,7 +1892,7 @@ Elm.clearBtn.addEventListener('click', () => {
 
 // 文字サイズ自動調整関数
 function adjustAAFontSize() {
-  const aaDisplays = document.querySelectorAll('.aa-display');
+  const aaDisplays = [Elm.localAA, Elm.remoteAA];
   const containerWidth = window.innerWidth;
   const containerHeight = window.innerHeight;
 
@@ -2002,43 +2053,7 @@ function closeDeviceDialog() {
 }
 
 async function applyDeviceSelection() {
-  const newVideoDeviceId = Elm.videoSelectDialog.value;
-  const newAudioDeviceId = Elm.audioSelectDialog.value;
-
-  // デバイス変更があるかチェック
-  const videoChanged = mediaManager.selectedDeviceIds.video !== newVideoDeviceId;
-  const audioChanged = mediaManager.selectedDeviceIds.audio !== newAudioDeviceId;
-
-  if (!videoChanged && !audioChanged) {
-    closeDeviceDialog();
-    return;
-  }
-
-  // 選択デバイスIDを更新
-  mediaManager.selectedDeviceIds.video = newVideoDeviceId;
-  mediaManager.selectedDeviceIds.audio = newAudioDeviceId;
-
-  // デスクトップ用の選択も同期
-  Elm.videoSelect.value = mediaManager.selectedDeviceIds.video;
-  Elm.audioSelect.value = mediaManager.selectedDeviceIds.audio;
-
-  console.log('デバイス選択適用:', {
-    video: Elm.videoSelectDialog.options[Elm.videoSelectDialog.selectedIndex]?.text,
-    audio: Elm.audioSelectDialog.options[Elm.audioSelectDialog.selectedIndex]?.text,
-    sessionActive: sessionManager.sessionActive
-  });
-
-  // 通話中の場合はデバイスを切り替え
-  if (sessionManager.sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
-    try {
-      await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
-    } catch (error) {
-      console.error('通話中のデバイス切り替えエラー:', error);
-      alert('デバイスの切り替えに失敗しました: ' + error.message);
-    }
-  }
-
-  closeDeviceDialog();
+  await mediaManager.applyDeviceSelection(sessionManager, webRTCManager, closeDeviceDialog);
 }
 
 // イベントリスナー設定
@@ -2107,7 +2122,7 @@ if (window.visualViewport) {
       setTimeout(() => {
         window.scrollTo(0, 0);
         // viewportを強制リセット
-        const viewport = document.querySelector('meta[name=viewport]');
+        const viewport = Elm.viewport;
         if (viewport) {
           viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
         }
