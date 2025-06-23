@@ -1,16 +1,40 @@
-// 一時的に Public な Piping Server をお借りする
-const PPNG_SERVER = 'https://ppng.io';
-const STUN_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
-  // 追加のSTUNサーバー
-  { urls: 'stun:stun.stunprotocol.org:3478' },
-  { urls: 'stun:stun.voipbuster.com:3478' },
-  { urls: 'stun:stun.voipstunt.com:3478' }
-];
+// Config class for constants
+class Config {
+  static get PPNG_SERVER() {
+    return 'https://ppng.io';
+  }
+  
+  static get STUN_SERVERS() {
+    return [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // 追加のSTUNサーバー
+      { urls: 'stun:stun.stunprotocol.org:3478' },
+      { urls: 'stun:stun.voipbuster.com:3478' },
+      { urls: 'stun:stun.voipstunt.com:3478' }
+    ];
+  }
+  
+  // ASCII文字セット（明度順、暗→明）
+  static get ASCII_CHARS() {
+    return ' .`\'"-:;!l/tfjrxnvcXYUJ0ZMKG8#@$';
+  }
+  
+  static get CHAR_COUNT() {
+    return Config.ASCII_CHARS.length;
+  }
+  
+  static get AA_WIDTH() {
+    return 80;
+  }
+  
+  static get AA_HEIGHT() {
+    return 60;
+  }
+}
 
 // セッショントークン生成
 function generateSessionToken() {
@@ -46,11 +70,6 @@ function xorDecrypt(encryptedBase64, key) {
   return decrypted.join('');
 }
 
-// ASCII文字セット（明度順、暗→明）
-const ASCII_CHARS = ' .`\'"-:;!l/tfjrxnvcXYUJ0ZMKG8#@$';
-const CHAR_COUNT = ASCII_CHARS.length;
-const AA_WIDTH = 80;
-const AA_HEIGHT = 60;
 
 let localStream = null;
 let peerConnection = null;
@@ -319,19 +338,19 @@ let dynamicRangeEnabled = true;
 function videoToAscii(video) {
   if (!video.videoWidth || !video.videoHeight) return '';
   
-  elements.canvas.width = AA_WIDTH;
-  elements.canvas.height = AA_HEIGHT;
+  elements.canvas.width = Config.AA_WIDTH;
+  elements.canvas.height = Config.AA_HEIGHT;
   
-  ctx.drawImage(video, 0, 0, AA_WIDTH, AA_HEIGHT);
-  const imageData = ctx.getImageData(0, 0, AA_WIDTH, AA_HEIGHT);
+  ctx.drawImage(video, 0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
+  const imageData = ctx.getImageData(0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
   const pixels = imageData.data;
   
   // 軽量グレースケール変換（AA変換時のみ）
   
   let ascii = '';
-  for (let y = 0; y < AA_HEIGHT; y++) {
-    for (let x = 0; x < AA_WIDTH; x++) {
-      const i = (y * AA_WIDTH + x) * 4;
+  for (let y = 0; y < Config.AA_HEIGHT; y++) {
+    for (let x = 0; x < Config.AA_WIDTH; x++) {
+      const i = (y * Config.AA_WIDTH + x) * 4;
       let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
       
       // ダイナミックレンジ調整
@@ -341,12 +360,12 @@ function videoToAscii(video) {
         brightness = Math.max(0, Math.min(1, brightness)); // クリップ
         
         // ASCII_CHARSのインデックスに変換
-        const charIndex = Math.floor(brightness * (CHAR_COUNT - 1));
-        ascii += ASCII_CHARS[charIndex];
+        const charIndex = Math.floor(brightness * (Config.CHAR_COUNT - 1));
+        ascii += Config.ASCII_CHARS[charIndex];
       } else {
         // 通常の変換
-        const charIndex = Math.floor((brightness / 255) * (CHAR_COUNT - 1));
-        ascii += ASCII_CHARS[charIndex];
+        const charIndex = Math.floor((brightness / 255) * (Config.CHAR_COUNT - 1));
+        ascii += Config.ASCII_CHARS[charIndex];
       }
     }
     ascii += '\n';
@@ -463,7 +482,7 @@ async function sendSignal(keyword, data) {
   const json = JSON.stringify(data);
   const encrypted = xorEncrypt(json, keyword);
   
-  const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
+  const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
     method: 'PUT',
     headers: { 
       'Content-Type': 'text/plain'
@@ -488,7 +507,7 @@ async function receiveSignal(keyword) {
   currentAbortController = new AbortController();
   
   try {
-    const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
+    const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
       signal: currentAbortController.signal
     });
     
@@ -517,7 +536,7 @@ async function receiveSignal(keyword) {
 
 async function createPeerConnection() {
   peerConnection = new RTCPeerConnection({ 
-    iceServers: STUN_SERVERS,
+    iceServers: Config.STUN_SERVERS,
     iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
     bundlePolicy: 'max-bundle', // メディアバンドル最大化
     rtcpMuxPolicy: 'require' // RTCP多重化
@@ -721,7 +740,7 @@ async function createPeerConnection() {
       // 400エラーをチェック（既存ホストの検出）
       if (error.message.includes('シグナル送信エラー')) {
         try {
-          const response = await fetch(`${PPNG_SERVER}/aachat/${keyword}`, {
+          const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({type: 'offer', offer: offer, token: sessionToken})
