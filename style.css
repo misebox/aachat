@@ -57,7 +57,7 @@ h3 {
     border-color: #ffffff;
 }
 
-.help-button {
+.desktop-help-btn {
     padding: 8px 12px;
     font-size: 16px;
     background-color: transparent;
@@ -72,7 +72,7 @@ h3 {
     justify-content: center;
 }
 
-.help-button:hover {
+.desktop-help-btn:hover {
     background-color: #333333;
     border-color: #ffffff;
 }
@@ -416,7 +416,7 @@ button:disabled {
     /* .desktop-device-btn {
         display: none;
     } */
-    .help-button {
+    .desktop-help-btn {
         display: none;
     }
     
