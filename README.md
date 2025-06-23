@@ -122,7 +122,7 @@ sequenceDiagram
 
 ## Piping Server の活用方法
 
-Piping Serverは本来、一回ですが、以下の方法でWebRTCシグナリングに転用しています：
+Piping Serverは本来一時的なデータ転送を行うものですが、以下の方法でWebRTCシグナリングに転用しています：
 
 1. **エンドポイント設計**: 
    - 初回のOffer: `/aachat/{keyword}`
