@@ -73,8 +73,246 @@ class Utility {
   }
 }
 
+// MediaManager class for device and stream management
+class MediaManager {
+  constructor() {
+    this.localStream = null;
+    this.availableDevices = {
+      videoDevices: [],
+      audioDevices: []
+    };
+    this.selectedDeviceIds = {
+      video: null,
+      audio: null
+    };
+  }
 
-let localStream = null;
+  async getAvailableDevices() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      
+      this.availableDevices.videoDevices = devices.filter(device => device.kind === 'videoinput');
+      this.availableDevices.audioDevices = devices.filter(device => device.kind === 'audioinput');
+      
+      console.log('ビデオデバイス:', this.availableDevices.videoDevices.length);
+      console.log('音声デバイス:', this.availableDevices.audioDevices.length);
+      
+      updateDeviceSelects();
+      
+    } catch (error) {
+      console.error('デバイス取得エラー:', error);
+    }
+  }
+
+  getSelectedDeviceIds() {
+    return {
+      video: elements.videoSelect.value || undefined,
+      audio: elements.audioSelect.value || undefined
+    };
+  }
+
+  async startCamera() {
+    try {
+      const deviceIds = this.getSelectedDeviceIds();
+      
+      // 80x60で試行
+      try {
+        const constraints = { 
+          video: { 
+            width: { exact: 80 }, 
+            height: { exact: 60 },
+            frameRate: { ideal: 60, min: 30 },
+            facingMode: 'user'
+          }, 
+          audio: true 
+        };
+        
+        // デバイスIDが選択されている場合は指定
+        if (deviceIds.video) {
+          constraints.video.deviceId = { exact: deviceIds.video };
+          delete constraints.video.facingMode; // deviceId指定時はfacingModeを削除
+        }
+        if (deviceIds.audio) {
+          constraints.audio = { deviceId: { exact: deviceIds.audio } };
+        }
+        
+        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
+        // フォールバック: 160x120
+        try {
+          const constraints = { 
+            video: { 
+              width: { exact: 160 }, 
+              height: { exact: 120 },
+              frameRate: { ideal: 60, min: 30 },
+              facingMode: 'user'
+            }, 
+            audio: true 
+          };
+          
+          if (deviceIds.video) {
+            constraints.video.deviceId = { exact: deviceIds.video };
+            delete constraints.video.facingMode;
+          }
+          if (deviceIds.audio) {
+            constraints.audio = { deviceId: { exact: deviceIds.audio } };
+          }
+          
+          this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch {
+          // 最終フォールバック: 320x240
+          const constraints = { 
+            video: { 
+              width: { exact: 320 }, 
+              height: { exact: 240 },
+              frameRate: { ideal: 60, min: 30 },
+              facingMode: 'user'
+            }, 
+            audio: true 
+          };
+          
+          if (deviceIds.video) {
+            constraints.video.deviceId = { exact: deviceIds.video };
+            delete constraints.video.facingMode;
+          }
+          if (deviceIds.audio) {
+            constraints.audio = { deviceId: { exact: deviceIds.audio } };
+          }
+          
+          this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        }
+      }
+      
+      elements.localVideo.srcObject = this.localStream;
+      console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
+      
+      // 使用中のデバイス情報を保存
+      const videoTrack = this.localStream.getVideoTracks()[0];
+      const audioTrack = this.localStream.getAudioTracks()[0];
+      if (videoTrack) {
+        this.selectedDeviceIds.video = videoTrack.getSettings().deviceId;
+        console.log('使用中ビデオデバイス:', videoTrack.label);
+      }
+      if (audioTrack) {
+        this.selectedDeviceIds.audio = audioTrack.getSettings().deviceId;
+        console.log('使用中音声デバイス:', audioTrack.label);
+      }
+      
+      // ローカルビデオの適切な再生処理
+      await playVideoSafely(elements.localVideo, 'ローカル');
+      
+      return true;
+    } catch (error) {
+      console.error('カメラ起動エラー:', error);
+      alert('カメラの起動に失敗しました: ' + error.message);
+      return false;
+    }
+  }
+
+  stopCamera() {
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream = null;
+      elements.localVideo.srcObject = null;
+    }
+  }
+
+  getVideoConstraints() {
+    return {
+      width: { exact: 80 }, 
+      height: { exact: 60 },
+      frameRate: { ideal: 60, min: 30 },
+      facingMode: 'user'
+    };
+  }
+
+  async switchDeviceDuringCall(videoChanged, audioChanged, peerConnection) {
+    const constraints = {};
+    
+    // 変更が必要なデバイスの制約を設定
+    if (videoChanged) {
+      constraints.video = this.selectedDeviceIds.video ? 
+      { deviceId: { exact: this.selectedDeviceIds.video }, ...this.getVideoConstraints() } : 
+      this.getVideoConstraints();
+    }
+    
+    if (audioChanged) {
+      constraints.audio = this.selectedDeviceIds.audio ? 
+      { deviceId: { exact: this.selectedDeviceIds.audio } } : 
+      true;
+    }
+    
+    console.log('デバイス切り替え開始:', constraints);
+    
+    // 新しいストリームを取得
+    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    // トラックを置換
+    const senders = peerConnection.getSenders();
+    
+    if (videoChanged) {
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+      
+      if (videoSender && newVideoTrack) {
+        await videoSender.replaceTrack(newVideoTrack);
+        
+        // 古いビデオトラックを停止
+        const oldVideoTrack = this.localStream.getVideoTracks()[0];
+        if (oldVideoTrack) {
+          oldVideoTrack.stop();
+          this.localStream.removeTrack(oldVideoTrack);
+        }
+        this.localStream.addTrack(newVideoTrack);
+      }
+    }
+    
+    if (audioChanged) {
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      const audioSender = senders.find(sender => sender.track && sender.track.kind === 'audio');
+      
+      if (audioSender && newAudioTrack) {
+        await audioSender.replaceTrack(newAudioTrack);
+        
+        // 古いオーディオトラックを停止
+        const oldAudioTrack = this.localStream.getAudioTracks()[0];
+        if (oldAudioTrack) {
+          oldAudioTrack.stop();
+          this.localStream.removeTrack(oldAudioTrack);
+        }
+        this.localStream.addTrack(newAudioTrack);
+      }
+    }
+    
+    // 新しいトラックを使用中のストリームに反映
+    elements.localVideo.srcObject = this.localStream;
+    
+    // 使用中のトラックのうち、新しいストリームに含まれないものを停止
+    newStream.getTracks().forEach(track => {
+      if (!this.localStream.getTracks().includes(track)) {
+        track.stop();
+      }
+    });
+    
+    console.log('デバイス切り替え完了');
+  }
+
+  getLocalStream() {
+    return this.localStream;
+  }
+
+  getAvailableVideoDevices() {
+    return this.availableDevices.videoDevices;
+  }
+
+  getAvailableAudioDevices() {
+    return this.availableDevices.audioDevices;
+  }
+}
+
+
+// Global instances
+const mediaManager = new MediaManager();
 let peerConnection = null;
 let dataChannel = null;
 let isHost = false;
@@ -126,52 +364,25 @@ const elements = {
 
 const ctx = elements.canvas.getContext('2d');
 
-// デバイス管理
-let availableDevices = {
-  videoDevices: [],
-  audioDevices: []
-};
-let selectedDeviceIds = {
-  video: null,
-  audio: null
-};
-
-// デバイス一覧を取得
-async function getAvailableDevices() {
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    
-    availableDevices.videoDevices = devices.filter(device => device.kind === 'videoinput');
-    availableDevices.audioDevices = devices.filter(device => device.kind === 'audioinput');
-    
-    console.log('ビデオデバイス:', availableDevices.videoDevices.length);
-    console.log('音声デバイス:', availableDevices.audioDevices.length);
-    
-    updateDeviceSelects();
-    
-  } catch (error) {
-    console.error('デバイス取得エラー:', error);
-  }
-}
 
 // デバイス選択肢を更新
 function updateDeviceSelects() {
   // デスクトップ用
-  updateSelectOptions(elements.videoSelect, availableDevices.videoDevices, 'カメラ');
-  updateSelectOptions(elements.audioSelect, availableDevices.audioDevices, 'マイク');
+  updateSelectOptions(elements.videoSelect, mediaManager.getAvailableVideoDevices(), 'カメラ');
+  updateSelectOptions(elements.audioSelect, mediaManager.getAvailableAudioDevices(), 'マイク');
   
   // ダイアログ用
-  updateSelectOptions(elements.videoSelectDialog, availableDevices.videoDevices, 'カメラ');
-  updateSelectOptions(elements.audioSelectDialog, availableDevices.audioDevices, 'マイク');
+  updateSelectOptions(elements.videoSelectDialog, mediaManager.getAvailableVideoDevices(), 'カメラ');
+  updateSelectOptions(elements.audioSelectDialog, mediaManager.getAvailableAudioDevices(), 'マイク');
   
   // 現在の選択を保持
-  if (selectedDeviceIds.video) {
-    elements.videoSelect.value = selectedDeviceIds.video;
-    elements.videoSelectDialog.value = selectedDeviceIds.video;
+  if (mediaManager.selectedDeviceIds.video) {
+    elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
+    elements.videoSelectDialog.value = mediaManager.selectedDeviceIds.video;
   }
-  if (selectedDeviceIds.audio) {
-    elements.audioSelect.value = selectedDeviceIds.audio;
-    elements.audioSelectDialog.value = selectedDeviceIds.audio;
+  if (mediaManager.selectedDeviceIds.audio) {
+    elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
+    elements.audioSelectDialog.value = mediaManager.selectedDeviceIds.audio;
   }
 }
 
@@ -185,13 +396,6 @@ function updateSelectOptions(selectElement, devices, prefix) {
   });
 }
 
-// 選択されたデバイスIDを取得
-function getSelectedDeviceIds() {
-  return {
-    video: elements.videoSelect.value || undefined,
-    audio: elements.audioSelect.value || undefined
-  };
-}
 
 async function playVideoSafely(videoElement, label) {
   return new Promise((resolve) => {
@@ -235,103 +439,6 @@ async function playVideoSafely(videoElement, label) {
   });
 }
 
-async function startCamera() {
-  try {
-    const deviceIds = getSelectedDeviceIds();
-    
-    // 80x60で試行
-    try {
-      const constraints = { 
-        video: { 
-          width: { exact: 80 }, 
-          height: { exact: 60 },
-          frameRate: { ideal: 60, min: 30 },
-          facingMode: 'user'
-        }, 
-        audio: true 
-      };
-      
-      // デバイスIDが選択されている場合は指定
-      if (deviceIds.video) {
-        constraints.video.deviceId = { exact: deviceIds.video };
-        delete constraints.video.facingMode; // deviceId指定時はfacingModeを削除
-      }
-      if (deviceIds.audio) {
-        constraints.audio = { deviceId: { exact: deviceIds.audio } };
-      }
-      
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch {
-      // フォールバック: 160x120
-      try {
-        const constraints = { 
-          video: { 
-            width: { exact: 160 }, 
-            height: { exact: 120 },
-            frameRate: { ideal: 60, min: 30 },
-            facingMode: 'user'
-          }, 
-          audio: true 
-        };
-        
-        if (deviceIds.video) {
-          constraints.video.deviceId = { exact: deviceIds.video };
-          delete constraints.video.facingMode;
-        }
-        if (deviceIds.audio) {
-          constraints.audio = { deviceId: { exact: deviceIds.audio } };
-        }
-        
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch {
-        // 最終フォールバック: 320x240
-        const constraints = { 
-          video: { 
-            width: { exact: 320 }, 
-            height: { exact: 240 },
-            frameRate: { ideal: 60, min: 30 },
-            facingMode: 'user'
-          }, 
-          audio: true 
-        };
-        
-        if (deviceIds.video) {
-          constraints.video.deviceId = { exact: deviceIds.video };
-          delete constraints.video.facingMode;
-        }
-        if (deviceIds.audio) {
-          constraints.audio = { deviceId: { exact: deviceIds.audio } };
-        }
-        
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      }
-    }
-    
-    elements.localVideo.srcObject = localStream;
-    console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
-    
-    // 使用中のデバイス情報を保存
-    const videoTrack = localStream.getVideoTracks()[0];
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (videoTrack) {
-      selectedDeviceIds.video = videoTrack.getSettings().deviceId;
-      console.log('使用中ビデオデバイス:', videoTrack.label);
-    }
-    if (audioTrack) {
-      selectedDeviceIds.audio = audioTrack.getSettings().deviceId;
-      console.log('使用中音声デバイス:', audioTrack.label);
-    }
-    
-    // ローカルビデオの適切な再生処理
-    await playVideoSafely(elements.localVideo, 'ローカル');
-    
-    return true;
-  } catch (error) {
-    console.error('カメラアクセスエラー:', error);
-    updateStatus('カメラアクセスが拒否されました: ' + error.message);
-    return false;
-  }
-}
 
 // ダイナミックレンジ調整パラメータ
 let minBrightness = 0;
@@ -547,10 +654,10 @@ async function createPeerConnection() {
   
   
   console.log('ローカルストリーム追加開始');
-  localStream.getTracks().forEach(track => {
+  mediaManager.getLocalStream().getTracks().forEach(track => {
     console.log('トラック追加:', track.kind, track.enabled, 'readyState:', track.readyState);
     if (track.readyState === 'live') {
-      peerConnection.addTrack(track, localStream);
+      peerConnection.addTrack(track, mediaManager.getLocalStream());
     } else {
       console.warn('トラックが無効:', track.kind, track.readyState);
     }
@@ -711,7 +818,7 @@ async function createPeerConnection() {
     
     currentKeyword = keyword;
     
-    if (!await startCamera()) return;
+    if (!await mediaManager.startCamera()) return;
     
     isHost = true;
     updateStatus('接続準備中...');
@@ -800,9 +907,9 @@ async function createPeerConnection() {
     sessionToken = Utility.generateSessionToken();
     
     // ローカルストリームが存在しない場合は再取得
-    if (!localStream) {
+    if (!mediaManager.getLocalStream()) {
       console.log('ローカルストリームを再取得中...');
-      if (!await startCamera()) {
+      if (!await mediaManager.startCamera()) {
         updateStatus('カメラアクセスエラー');
         return;
       }
@@ -842,12 +949,11 @@ async function createPeerConnection() {
     currentKeyword = keyword;
     
     // 既存ストリームのクリーンアップ
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      localStream = null;
+    if (mediaManager.getLocalStream()) {
+      mediaManager.stopCamera();
     }
     
-    if (!await startCamera()) return;
+    if (!await mediaManager.startCamera()) return;
     
     isHost = false;
     updateStatus('接続中...');
@@ -1097,10 +1203,8 @@ async function createPeerConnection() {
     }
     
     // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      localStream = null;
-      elements.localVideo.srcObject = null;
+    if (mediaManager.getLocalStream()) {
+      mediaManager.stopCamera();
       elements.localAA.textContent = '';
       console.log('ローカルビデオストリーム停止');
     }
@@ -1407,8 +1511,8 @@ async function createPeerConnection() {
     const newAudioDeviceId = elements.audioSelectDialog.value;
     
     // デバイス変更があるかチェック
-    const videoChanged = selectedDeviceIds.video !== newVideoDeviceId;
-    const audioChanged = selectedDeviceIds.audio !== newAudioDeviceId;
+    const videoChanged = mediaManager.selectedDeviceIds.video !== newVideoDeviceId;
+    const audioChanged = mediaManager.selectedDeviceIds.audio !== newAudioDeviceId;
     
     if (!videoChanged && !audioChanged) {
       closeDeviceDialog();
@@ -1416,12 +1520,12 @@ async function createPeerConnection() {
     }
     
     // 選択デバイスIDを更新
-    selectedDeviceIds.video = newVideoDeviceId;
-    selectedDeviceIds.audio = newAudioDeviceId;
+    mediaManager.selectedDeviceIds.video = newVideoDeviceId;
+    mediaManager.selectedDeviceIds.audio = newAudioDeviceId;
     
     // デスクトップ用の選択も同期
-    elements.videoSelect.value = selectedDeviceIds.video;
-    elements.audioSelect.value = selectedDeviceIds.audio;
+    elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
+    elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
     
     console.log('デバイス選択適用:', {
       video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
@@ -1430,9 +1534,9 @@ async function createPeerConnection() {
     });
     
     // 通話中の場合はデバイスを切り替え
-    if (sessionActive && localStream && peerConnection) {
+    if (sessionActive && mediaManager.getLocalStream() && peerConnection) {
       try {
-        await switchDeviceDuringCall(videoChanged, audioChanged);
+        await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, peerConnection);
       } catch (error) {
         console.error('通話中のデバイス切り替えエラー:', error);
         alert('デバイスの切り替えに失敗しました: ' + error.message);
@@ -1442,97 +1546,13 @@ async function createPeerConnection() {
     closeDeviceDialog();
   }
   
-  // ビデオ制約を取得
-  function getVideoConstraints() {
-    return {
-      width: { exact: 80 }, 
-      height: { exact: 60 },
-      frameRate: { ideal: 60, min: 30 },
-      facingMode: 'user'
-    };
-  }
-  
-  // 通話中のデバイス切り替え
-  async function switchDeviceDuringCall(videoChanged, audioChanged) {
-    const constraints = {};
-    
-    // 変更が必要なデバイスの制約を設定
-    if (videoChanged) {
-      constraints.video = selectedDeviceIds.video ? 
-      { deviceId: { exact: selectedDeviceIds.video }, ...getVideoConstraints() } : 
-      getVideoConstraints();
-    }
-    
-    if (audioChanged) {
-      constraints.audio = selectedDeviceIds.audio ? 
-      { deviceId: { exact: selectedDeviceIds.audio } } : 
-      true;
-    }
-    
-    console.log('デバイス切り替え開始:', constraints);
-    
-    // 新しいストリームを取得
-    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-    
-    // トラックを置換
-    const senders = peerConnection.getSenders();
-    
-    if (videoChanged && newStream.getVideoTracks().length > 0) {
-      const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
-      if (videoSender) {
-        const oldTrack = videoSender.track;
-        await videoSender.replaceTrack(newStream.getVideoTracks()[0]);
-        oldTrack.stop();
-        console.log('ビデオトラック切り替え完了');
-      }
-    }
-    
-    if (audioChanged && newStream.getAudioTracks().length > 0) {
-      const audioSender = senders.find(sender => sender.track && sender.track.kind === 'audio');
-      if (audioSender) {
-        const oldTrack = audioSender.track;
-        await audioSender.replaceTrack(newStream.getAudioTracks()[0]);
-        oldTrack.stop();
-        console.log('オーディオトラック切り替え完了');
-      }
-    }
-    
-    // ローカルストリームを更新
-    if (videoChanged) {
-      const oldVideoTracks = localStream.getVideoTracks();
-      oldVideoTracks.forEach(track => {
-        localStream.removeTrack(track);
-        track.stop();
-      });
-      newStream.getVideoTracks().forEach(track => {
-        localStream.addTrack(track);
-      });
-    }
-    
-    if (audioChanged) {
-      const oldAudioTracks = localStream.getAudioTracks();
-      oldAudioTracks.forEach(track => {
-        localStream.removeTrack(track);
-        track.stop();
-      });
-      newStream.getAudioTracks().forEach(track => {
-        localStream.addTrack(track);
-      });
-    }
-    
-    // ローカルビデオ要素を更新
-    elements.localVideo.srcObject = localStream;
-    
-    console.log('デバイス切り替え完了');
-  }
-  
   // イベントリスナー設定
   elements.deviceBtn.addEventListener('click', openDeviceDialog);
   elements.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
   elements.closeDialog.addEventListener('click', closeDeviceDialog);
   elements.applyDevices.addEventListener('click', applyDeviceSelection);
-  elements.refreshDevices.addEventListener('click', getAvailableDevices);
-  elements.refreshDevicesDialog.addEventListener('click', getAvailableDevices);
+  elements.refreshDevices.addEventListener('click', () => mediaManager.getAvailableDevices());
+  elements.refreshDevicesDialog.addEventListener('click', () => mediaManager.getAvailableDevices());
   
   // ヘルプダイアログのイベントリスナー
   elements.helpBtn.addEventListener('click', () => {
@@ -1562,13 +1582,13 @@ async function createPeerConnection() {
   });
   
   elements.videoSelect.addEventListener('change', () => {
-    if (localStream) {
+    if (mediaManager.getLocalStream()) {
       console.log('ビデオデバイス変更:', elements.videoSelect.options[elements.videoSelect.selectedIndex].text);
     }
   });
   
   elements.audioSelect.addEventListener('change', () => {
-    if (localStream) {
+    if (mediaManager.getLocalStream()) {
       console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
     }
   });
@@ -1577,5 +1597,5 @@ async function createPeerConnection() {
   loadKeywordFromURL();
   startAAConversion();
   adjustAAFontSize();
-  getAvailableDevices();
+  mediaManager.getAvailableDevices();
   
