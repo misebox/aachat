@@ -3,7 +3,7 @@ class Config {
   static get PPNG_SERVER() {
     return 'https://ppng.io';
   }
-  
+
   static get STUN_SERVERS() {
     return [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -17,20 +17,20 @@ class Config {
       { urls: 'stun:stun.voipstunt.com:3478' }
     ];
   }
-  
+
   // ASCII文字セット（明度順、暗→明）
   static get ASCII_CHARS() {
     return ' .`\'"-:;!l/tfjrxnvcXYUJ0ZMKG8#@$';
   }
-  
+
   static get CHAR_COUNT() {
     return Config.ASCII_CHARS.length;
   }
-  
+
   static get AA_WIDTH() {
     return 80;
   }
-  
+
   static get AA_HEIGHT() {
     return 60;
   }
@@ -90,15 +90,15 @@ class MediaManager {
   async getAvailableDevices() {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      
+
       this.availableDevices.videoDevices = devices.filter(device => device.kind === 'videoinput');
       this.availableDevices.audioDevices = devices.filter(device => device.kind === 'audioinput');
-      
+
       console.log('ビデオデバイス:', this.availableDevices.videoDevices.length);
       console.log('音声デバイス:', this.availableDevices.audioDevices.length);
-      
+
       updateDeviceSelects();
-      
+
     } catch (error) {
       console.error('デバイス取得エラー:', error);
     }
@@ -114,19 +114,19 @@ class MediaManager {
   async startCamera() {
     try {
       const deviceIds = this.getSelectedDeviceIds();
-      
+
       // 80x60で試行
       try {
-        const constraints = { 
-          video: { 
-            width: { exact: 80 }, 
+        const constraints = {
+          video: {
+            width: { exact: 80 },
             height: { exact: 60 },
             frameRate: { ideal: 60, min: 30 },
             facingMode: 'user'
-          }, 
-          audio: true 
+          },
+          audio: true
         };
-        
+
         // デバイスIDが選択されている場合は指定
         if (deviceIds.video) {
           constraints.video.deviceId = { exact: deviceIds.video };
@@ -135,21 +135,21 @@ class MediaManager {
         if (deviceIds.audio) {
           constraints.audio = { deviceId: { exact: deviceIds.audio } };
         }
-        
+
         this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch {
         // フォールバック: 160x120
         try {
-          const constraints = { 
-            video: { 
-              width: { exact: 160 }, 
+          const constraints = {
+            video: {
+              width: { exact: 160 },
               height: { exact: 120 },
               frameRate: { ideal: 60, min: 30 },
               facingMode: 'user'
-            }, 
-            audio: true 
+            },
+            audio: true
           };
-          
+
           if (deviceIds.video) {
             constraints.video.deviceId = { exact: deviceIds.video };
             delete constraints.video.facingMode;
@@ -157,20 +157,20 @@ class MediaManager {
           if (deviceIds.audio) {
             constraints.audio = { deviceId: { exact: deviceIds.audio } };
           }
-          
+
           this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch {
           // 最終フォールバック: 320x240
-          const constraints = { 
-            video: { 
-              width: { exact: 320 }, 
+          const constraints = {
+            video: {
+              width: { exact: 320 },
               height: { exact: 240 },
               frameRate: { ideal: 60, min: 30 },
               facingMode: 'user'
-            }, 
-            audio: true 
+            },
+            audio: true
           };
-          
+
           if (deviceIds.video) {
             constraints.video.deviceId = { exact: deviceIds.video };
             delete constraints.video.facingMode;
@@ -178,14 +178,14 @@ class MediaManager {
           if (deviceIds.audio) {
             constraints.audio = { deviceId: { exact: deviceIds.audio } };
           }
-          
+
           this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
         }
       }
-      
+
       elements.localVideo.srcObject = this.localStream;
       console.log('カメラ解像度:', elements.localVideo.videoWidth, 'x', elements.localVideo.videoHeight);
-      
+
       // 使用中のデバイス情報を保存
       const videoTrack = this.localStream.getVideoTracks()[0];
       const audioTrack = this.localStream.getAudioTracks()[0];
@@ -197,10 +197,10 @@ class MediaManager {
         this.selectedDeviceIds.audio = audioTrack.getSettings().deviceId;
         console.log('使用中音声デバイス:', audioTrack.label);
       }
-      
+
       // ローカルビデオの適切な再生処理
       await playVideoSafely(elements.localVideo, 'ローカル');
-      
+
       return true;
     } catch (error) {
       console.error('カメラ起動エラー:', error);
@@ -219,7 +219,7 @@ class MediaManager {
 
   getVideoConstraints() {
     return {
-      width: { exact: 80 }, 
+      width: { exact: 80 },
       height: { exact: 60 },
       frameRate: { ideal: 60, min: 30 },
       facingMode: 'user'
@@ -228,25 +228,25 @@ class MediaManager {
 
   async switchDeviceDuringCall(videoChanged, audioChanged, peerConnection) {
     const constraints = {};
-    
+
     // 変更が必要なデバイスの制約を設定
     if (videoChanged) {
-      constraints.video = this.selectedDeviceIds.video ? 
-      { deviceId: { exact: this.selectedDeviceIds.video }, ...this.getVideoConstraints() } : 
-      this.getVideoConstraints();
+      constraints.video = this.selectedDeviceIds.video ?
+        { deviceId: { exact: this.selectedDeviceIds.video }, ...this.getVideoConstraints() } :
+        this.getVideoConstraints();
     }
-    
+
     if (audioChanged) {
-      constraints.audio = this.selectedDeviceIds.audio ? 
-      { deviceId: { exact: this.selectedDeviceIds.audio } } : 
-      true;
+      constraints.audio = this.selectedDeviceIds.audio ?
+        { deviceId: { exact: this.selectedDeviceIds.audio } } :
+        true;
     }
-    
+
     console.log('デバイス切り替え開始:', constraints);
-    
+
     // 新しいストリームを取得
     const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-    
+
     // トラックを置換
     const pc = webRTCManager.getPeerConnection();
     if (!pc) {
@@ -254,14 +254,14 @@ class MediaManager {
       return;
     }
     const senders = pc.getSenders();
-    
+
     if (videoChanged) {
       const newVideoTrack = newStream.getVideoTracks()[0];
       const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
-      
+
       if (videoSender && newVideoTrack) {
         await videoSender.replaceTrack(newVideoTrack);
-        
+
         // 古いビデオトラックを停止
         const oldVideoTrack = this.localStream.getVideoTracks()[0];
         if (oldVideoTrack) {
@@ -271,14 +271,14 @@ class MediaManager {
         this.localStream.addTrack(newVideoTrack);
       }
     }
-    
+
     if (audioChanged) {
       const newAudioTrack = newStream.getAudioTracks()[0];
       const audioSender = senders.find(sender => sender.track && sender.track.kind === 'audio');
-      
+
       if (audioSender && newAudioTrack) {
         await audioSender.replaceTrack(newAudioTrack);
-        
+
         // 古いオーディオトラックを停止
         const oldAudioTrack = this.localStream.getAudioTracks()[0];
         if (oldAudioTrack) {
@@ -288,17 +288,17 @@ class MediaManager {
         this.localStream.addTrack(newAudioTrack);
       }
     }
-    
+
     // 新しいトラックを使用中のストリームに反映
     elements.localVideo.srcObject = this.localStream;
-    
+
     // 使用中のトラックのうち、新しいストリームに含まれないものを停止
     newStream.getTracks().forEach(track => {
       if (!this.localStream.getTracks().includes(track)) {
         track.stop();
       }
     });
-    
+
     console.log('デバイス切り替え完了');
   }
 
@@ -374,13 +374,13 @@ class WebRTCManager {
 
   async createPeerConnection(elements) {
     this.elements = elements; // elementsを保存
-    this.peerConnection = new RTCPeerConnection({ 
+    this.peerConnection = new RTCPeerConnection({
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
       bundlePolicy: 'max-bundle', // メディアバンドル最大化
       rtcpMuxPolicy: 'require' // RTCP多重化
     });
-    
+
     console.log('ローカルストリーム追加開始');
     mediaManager.getLocalStream().getTracks().forEach(track => {
       console.log('トラック追加:', track.kind, track.enabled, 'readyState:', track.readyState);
@@ -391,7 +391,7 @@ class WebRTCManager {
       }
     });
     console.log('ローカルストリーム追加完了');
-    
+
     // 高FPS設定をトラック追加後に設定
     setTimeout(async () => {
       const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
@@ -405,48 +405,48 @@ class WebRTCManager {
         }
       }
     }, 1000);
-    
+
     this.peerConnection.ontrack = (event) => {
       console.log('リモートトラック受信:', event.track.kind);
       console.log('Remote video element:', this.elements.remoteVideo);
       console.log('Event streams:', event.streams);
-      
+
       if (this.elements.remoteVideo && event.streams[0]) {
         this.elements.remoteVideo.srcObject = event.streams[0];
         this.elements.remoteVideo.onloadedmetadata = () => {
           console.log('リモートビデオサイズ:', this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
           console.log('Remote video ready for AA conversion');
         };
-        
+
         // より確実なビデオ準備待ち
         this.elements.remoteVideo.oncanplay = () => {
           console.log('Remote video can play - forcing play');
           this.elements.remoteVideo.play().catch(e => console.log('Remote video play failed:', e));
         };
-        
+
         // リモートビデオの適切な再生処理
         playVideoSafely(this.elements.remoteVideo, 'リモート');
       } else {
         console.error('Missing remote video element or stream');
       }
     };
-    
+
     this.peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
         console.log('ICE候補収集:', event.candidate.type, event.candidate.address);
         this.iceCandidates.push(event.candidate);
-        
+
         // タイムアウトをリセット
         if (this.iceGatheringTimeout) clearTimeout(this.iceGatheringTimeout);
-        
+
         // 3秒待ってから送信（より多くの候補を収集）
         this.iceGatheringTimeout = setTimeout(async () => {
           console.log('ICE候補収集タイムアウト. 候補数:', this.iceCandidates.length);
           if (this.iceCandidates.length > 0) {
             const keyword = sessionManager.currentKeyword || elements.keyword.value;
-            const iceKey = sessionManager.sessionToken ? 
-            `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
-            `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
+            const iceKey = sessionManager.sessionToken ?
+              `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
+              `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
             console.log('ICE候補送信:', iceKey);
             await signalingManager.sendSignal(iceKey, {
               type: 'ice-batch',
@@ -461,9 +461,9 @@ class WebRTCManager {
         console.log('ICE候補収集完了. 候補数:', this.iceCandidates.length);
         if (this.iceCandidates.length > 0) {
           const keyword = sessionManager.currentKeyword || elements.keyword.value;
-          const iceKey = sessionManager.sessionToken ? 
-          `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
-          `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
+          const iceKey = sessionManager.sessionToken ?
+            `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
+            `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
           console.log('ICE候補送信:', iceKey);
           await signalingManager.sendSignal(iceKey, {
             type: 'ice-batch',
@@ -473,26 +473,26 @@ class WebRTCManager {
         }
       }
     };
-    
+
     this.setupConnectionEventHandlers();
   }
 
   setupConnectionEventHandlers() {
     this.peerConnection.onconnectionstatechange = async () => {
       console.log('接続状態:', this.peerConnection.connectionState);
-      
+
       if (this.peerConnection.connectionState === 'connected') {
         sessionManager.sessionActive = true;
         sessionManager.connectionEstablished = true;
-        isWaitingForGuest = false;
-        reconnectAttempts = 0;
+        aaChat.isWaitingForGuest = false;
+        aaChat.reconnectAttempts = 0;
         clearKeywordTimer();
         stopAllPolling(); // 接続完了時にポーリング停止
-        
+
         // connectionTypeを取得して表示（何度か試行）
         console.log('onconnectionstatechange: 接続完了を検出');
         await updateConnectionInfo(true);
-        
+
         // connectionTypeが取得できない場合に備えて数回リトライ
         let retryCount = 0;
         const retryTimer = setInterval(async () => {
@@ -508,47 +508,47 @@ class WebRTCManager {
             clearInterval(retryTimer);
           }
         }, 2000);
-      } else if (this.peerConnection.connectionState === 'disconnected' || 
+      } else if (this.peerConnection.connectionState === 'disconnected' ||
         this.peerConnection.connectionState === 'failed') {
-          if (sessionManager.connectionEstablished) {
-            // 一度接続した後の切断の場合
-            sessionManager.connectionEstablished = false;
-            sessionManager.sessionActive = false;
-            
-            if (sessionManager.isHost) {
-              // ホストは最初からやり直し
-              uiManager.updateStatus('参加者が退室しました。新しいセッションを開始中...');
-              setTimeout(() => {
-                restartHostSession();
-              }, 1000);
-            } else {
-              // ゲストは接続失敗として処理
-              uiManager.updateStatus('接続が切断されました');
-              cleanup();
-            }
+        if (sessionManager.connectionEstablished) {
+          // 一度接続した後の切断の場合
+          sessionManager.connectionEstablished = false;
+          sessionManager.sessionActive = false;
+
+          if (sessionManager.isHost) {
+            // ホストは最初からやり直し
+            uiManager.updateStatus('参加者が退室しました。新しいセッションを開始中...');
+            setTimeout(() => {
+              restartHostSession();
+            }, 1000);
           } else {
-            handleDisconnect();
+            // ゲストは接続失敗として処理
+            uiManager.updateStatus('接続が切断されました');
+            cleanup();
           }
-        }
-      };
-      
-      // ICE接続状態の監視
-      this.peerConnection.oniceconnectionstatechange = async () => {
-        console.log('ICE接続状態:', this.peerConnection.iceConnectionState);
-        
-        // ICE接続が完了した場合はステータスを更新
-        if (this.peerConnection.iceConnectionState === 'connected') {
-          await updateConnectionInfo(true);
         } else {
-          updateConnectionInfo();
+          handleDisconnect();
         }
-      };
-      
-      // ICE収集状態の監視
-      this.peerConnection.onicegatheringstatechange = () => {
-        console.log('ICE収集状態:', this.peerConnection.iceGatheringState);
+      }
+    };
+
+    // ICE接続状態の監視
+    this.peerConnection.oniceconnectionstatechange = async () => {
+      console.log('ICE接続状態:', this.peerConnection.iceConnectionState);
+
+      // ICE接続が完了した場合はステータスを更新
+      if (this.peerConnection.iceConnectionState === 'connected') {
+        await updateConnectionInfo(true);
+      } else {
         updateConnectionInfo();
-      };
+      }
+    };
+
+    // ICE収集状態の監視
+    this.peerConnection.onicegatheringstatechange = () => {
+      console.log('ICE収集状態:', this.peerConnection.iceGatheringState);
+      updateConnectionInfo();
+    };
   }
 
   setupDataChannel() {
@@ -567,11 +567,11 @@ class WebRTCManager {
     this.dataChannel.onopen = () => {
       console.log('データチャンネル開通');
     };
-    
+
     this.dataChannel.onmessage = (event) => {
       const message = JSON.parse(event.data);
     };
-    
+
     this.dataChannel.onerror = (error) => {
       console.error('データチャンネルエラー:', error);
     };
@@ -632,15 +632,15 @@ class SignalingManager {
     console.log('送信中:', keyword, 'データタイプ:', data.type);
     const json = JSON.stringify(data);
     const encrypted = Utility.xorEncrypt(json, keyword);
-    
+
     const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
       method: 'PUT',
-      headers: { 
+      headers: {
         'Content-Type': 'text/plain'
       },
       body: encrypted
     });
-    
+
     if (!response.ok) {
       console.error('送信エラー:', response.status, response.statusText);
       throw new Error('シグナル送信エラー');
@@ -650,18 +650,18 @@ class SignalingManager {
 
   async receiveSignal(keyword) {
     console.log('受信試行:', keyword);
-    
+
     // AbortControllerを作成（既存のものがあればキャンセル）
     if (this.abortController) {
       this.abortController.abort();
     }
     this.abortController = new AbortController();
-    
+
     try {
       const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
         signal: this.abortController.signal
       });
-      
+
       if (!response.ok) {
         if (response.status === 400) {
           console.log('受信結果: データなし (400)');
@@ -670,7 +670,7 @@ class SignalingManager {
         console.error('受信エラー:', response.status, response.statusText);
         throw new Error('シグナル受信エラー');
       }
-      
+
       console.log('受信成功:', keyword);
       const encrypted = await response.text();
       const decrypted = Utility.xorDecrypt(encrypted, keyword);
@@ -710,26 +710,26 @@ class ASCIIConverter {
 
   videoToAscii(video) {
     if (!video.videoWidth || !video.videoHeight) return '';
-    
+
     this.canvas.width = Config.AA_WIDTH;
     this.canvas.height = Config.AA_HEIGHT;
-    
+
     this.ctx.drawImage(video, 0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
     const imageData = this.ctx.getImageData(0, 0, Config.AA_WIDTH, Config.AA_HEIGHT);
     const pixels = imageData.data;
-    
+
     let ascii = '';
     for (let y = 0; y < Config.AA_HEIGHT; y++) {
       for (let x = 0; x < Config.AA_WIDTH; x++) {
         const i = (y * Config.AA_WIDTH + x) * 4;
         let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-        
+
         // ダイナミックレンジ調整
         if (this.dynamicRangeEnabled && this.maxBrightness > this.minBrightness) {
           // 現在の輝度を0-1の範囲に正規化
           brightness = (brightness - this.minBrightness) / (this.maxBrightness - this.minBrightness);
           brightness = Math.max(0, Math.min(1, brightness)); // クリップ
-          
+
           // ASCII_CHARSのインデックスに変換
           const charIndex = Math.floor(brightness * (Config.CHAR_COUNT - 1));
           ascii += Config.ASCII_CHARS[charIndex];
@@ -741,30 +741,30 @@ class ASCIIConverter {
       }
       ascii += '\n';
     }
-    
+
     return ascii;
   }
 
   analyzeAndAdjustContrast(video) {
     if (!video.videoWidth || !video.videoHeight) return;
-    
+
     // サンプリング用の小さいキャンバス
     const sampleWidth = 64;
     const sampleHeight = 64;
     this.canvas.width = sampleWidth;
     this.canvas.height = sampleHeight;
-    
+
     this.ctx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
     const imageData = this.ctx.getImageData(0, 0, sampleWidth, sampleHeight);
     const pixels = imageData.data;
-    
+
     // 明度の統計を計算
     let min = 255;
     let max = 0;
     let sum = 0;
     let count = 0;
     const brightnessValues = [];
-    
+
     for (let i = 0; i < pixels.length; i += 4) {
       const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
       brightnessValues.push(brightness);
@@ -773,9 +773,9 @@ class ASCIIConverter {
       sum += brightness;
       count++;
     }
-    
+
     const mean = sum / count;
-    
+
     // 分散と標準偏差を計算
     let variance = 0;
     for (const brightness of brightnessValues) {
@@ -783,12 +783,12 @@ class ASCIIConverter {
     }
     variance /= count;
     const stdDev = Math.sqrt(variance);
-    
+
     // パーセンタイルを計算（外れ値除去のため）
     brightnessValues.sort((a, b) => a - b);
     const percentile5 = brightnessValues[Math.floor(count * 0.05)];
     const percentile95 = brightnessValues[Math.floor(count * 0.95)];
-    
+
     // 分散に基づいた調整
     if (stdDev < 20) {
       // 低分散（単調な画像）: より積極的にレンジを拡張
@@ -804,7 +804,7 @@ class ASCIIConverter {
       this.minBrightness = Math.max(0, min - margin);
       this.maxBrightness = Math.min(255, max + margin);
     }
-    
+
     // レンジが狭すぎる場合は調整
     if (this.maxBrightness - this.minBrightness < 30) {
       const center = (this.minBrightness + this.maxBrightness) / 2;
@@ -816,14 +816,14 @@ class ASCIIConverter {
   startConversion(localVideo, remoteVideo, localAA, remoteAA) {
     // 既に動作中の場合は停止してから再開
     this.stopConversion();
-    
+
     // コントラスト調整タイマー（1秒ごと）
     this.contrastTimer = setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
         this.analyzeAndAdjustContrast(localVideo);
       }
     }, 1000);
-    
+
     // AA変換タイマー（60fpsに合わせて約16msごと）
     this.conversionTimer = setInterval(() => {
       // ローカルビデオからAAを生成して表示
@@ -831,7 +831,7 @@ class ASCIIConverter {
         const localAAText = this.videoToAscii(localVideo);
         localAA.textContent = localAAText;
       }
-      
+
       // リモートビデオからAAを生成して表示
       if (remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
         const remoteAAText = this.videoToAscii(remoteVideo);
@@ -877,13 +877,13 @@ class UIManager {
   toggleButtons(enabled) {
     this.elements.hostBtn.disabled = !enabled;
     this.elements.joinBtn.disabled = !enabled;
-    
+
     // モバイルでもボタンを完全に非表示にする
     this.elements.hostBtn.style.display = enabled ? 'inline-block' : 'none';
     this.elements.joinBtn.style.display = enabled ? 'inline-block' : 'none';
     this.elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
     this.elements.clearBtn.style.display = enabled ? 'none' : 'inline-block';
-    
+
     // キーワード入力のロック状態を更新（enabled=falseはセッション中を意味する）
     this.updateKeywordLockState(!enabled);
   }
@@ -891,20 +891,20 @@ class UIManager {
   adjustAAFontSize() {
     const containerWidth = window.innerWidth;
     const containerHeight = window.innerHeight;
-    
+
     // モバイルの場合は個別に調整
     if (containerWidth <= 768) {
       this.adjustMobileAASize();
       return;
     }
-    
+
     // タブレットの場合は画面に収まるように調整
     if (containerWidth <= 1200) {
       // 縦向きか横向きかを判定
       const isPortrait = containerHeight > containerWidth;
-      
+
       let availableWidth, availableHeight, fontSizeByWidth, fontSizeByHeight;
-      
+
       if (isPortrait) {
         // 縦向きタブレット：縦並びレイアウト
         availableWidth = containerWidth - 40; // 1つのAAエリア + マージン
@@ -918,7 +918,7 @@ class UIManager {
         fontSizeByWidth = availableWidth / (80 * 0.6 + 79 * 0.4);
         fontSizeByHeight = availableHeight / 60;
       }
-      
+
       const tabletFontSize = Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
       document.documentElement.style.setProperty('--aa-font-size', `${tabletFontSize}px`);
       console.log('タブレットAAサイズ調整:', tabletFontSize + 'px', {
@@ -930,16 +930,16 @@ class UIManager {
       });
       return;
     }
-    
+
     // デスクトップの場合は実際のコンテナサイズを計算
     const chatArea = document.querySelector('.chat-area');
-    
+
     // 実際に使用されているスペースを計算
     const h1 = document.querySelector('h1');
     const controls = document.querySelector('.controls');
     const desktopStatus = document.querySelector('.desktop-status');
     const container = document.querySelector('.container');
-    
+
     let usedHeight = 0;
     if (h1) usedHeight += h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom);
     if (controls) usedHeight += controls.offsetHeight + parseInt(getComputedStyle(controls).marginTop) + parseInt(getComputedStyle(controls).marginBottom);
@@ -948,64 +948,64 @@ class UIManager {
       const containerPadding = parseInt(getComputedStyle(container).paddingTop) + parseInt(getComputedStyle(container).paddingBottom);
       usedHeight += containerPadding;
     }
-    
+
     const actualChatAreaHeight = containerHeight - usedHeight;
     const actualChatAreaWidth = chatArea ? chatArea.clientWidth : containerWidth - 20;
-    
+
     let fontSize;
-    
+
     if (containerWidth > 1200) {
       // 横並びレイアウト - 2つのAAエリアが横に並ぶ
       // CSSのgapサイズを動的に取得
       const chatAreaStyles = getComputedStyle(chatArea);
       const gapSize = parseInt(chatAreaStyles.gap) || 0;
       const availableWidthPerArea = (actualChatAreaWidth - gapSize) / 2;
-      
+
       // video-container内でのh3タイトルの実際の高さを取得
       const sampleH3 = document.querySelector('.video-container h3');
       const titleHeight = sampleH3 ? sampleH3.offsetHeight : 0;
       const availableHeightPerArea = actualChatAreaHeight - titleHeight;
-      
+
       // CSS width formula: calc(80 * fontSize * 0.6 + 79 * fontSize * 0.4)
       const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
       const fontSizeByWidth = availableWidthPerArea / widthMultiplier;
       const fontSizeByHeight = availableHeightPerArea / 60;
-      
+
       fontSize = Math.min(fontSizeByWidth, fontSizeByHeight, 20);
     } else {
       // 縦並びレイアウト - AAエリアが縦に並ぶ
       const availableWidth = actualChatAreaWidth;
-      
+
       // 実際のDOM要素のサイズを取得
       const mobileStatus = document.querySelector('.mobile-status');
       const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
-      
+
       // h3タイトル要素の実際の高さを取得（2つ分）
       const h3Elements = document.querySelectorAll('.video-container h3');
       let totalTitleHeight = 0;
       h3Elements.forEach(h3 => {
         if (h3) totalTitleHeight += h3.offsetHeight;
       });
-      
+
       const availableHeightPerArea = (actualChatAreaHeight - mobileStatusHeight - totalTitleHeight) / 2;
-      
+
       const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
       const fontSizeByWidth = availableWidth / widthMultiplier;
       const fontSizeByHeight = availableHeightPerArea / 60;
-      
+
       fontSize = Math.min(fontSizeByWidth, fontSizeByHeight, 18);
     }
-    
+
     fontSize = Math.max(fontSize, 8); // 最小8px
-    
+
     // CSSカスタムプロパティで動的に設定
     document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
-    
+
     // 設定後に実際のサイズを検証して調整
     setTimeout(() => {
       this.validateAndAdjustAASize(fontSize);
     }, 100);
-    
+
     console.log('AA表示フォントサイズ調整:', fontSize + 'px', {
       containerWidth,
       containerHeight,
@@ -1018,16 +1018,16 @@ class UIManager {
   validateAndAdjustAASize(initialFontSize) {
     const aaDisplays = document.querySelectorAll('.aa-display');
     const chatArea = document.querySelector('.chat-area');
-    
+
     if (!chatArea || aaDisplays.length === 0) return;
-    
+
     const chatAreaRect = chatArea.getBoundingClientRect();
     let needsAdjustment = false;
     let adjustmentFactor = 1.0;
-    
+
     aaDisplays.forEach(display => {
       const rect = display.getBoundingClientRect();
-      
+
       // 幅のはみ出しチェック
       if (rect.width > chatAreaRect.width) {
         const widthFactor = (chatAreaRect.width - 20) / rect.width; // 20px マージン
@@ -1035,14 +1035,14 @@ class UIManager {
         needsAdjustment = true;
         console.log('幅はみ出し検出:', rect.width, '>', chatAreaRect.width);
       }
-      
+
       // 高さのはみ出しチェック（親コンテナとの比較）
       const container = display.closest('.video-container');
       if (container) {
         const containerRect = container.getBoundingClientRect();
         const titleHeight = 30; // h3タイトル分
         const availableHeight = containerRect.height - titleHeight;
-        
+
         if (rect.height > availableHeight) {
           const heightFactor = availableHeight / rect.height;
           adjustmentFactor = Math.min(adjustmentFactor, heightFactor);
@@ -1051,7 +1051,7 @@ class UIManager {
         }
       }
     });
-    
+
     if (needsAdjustment) {
       const adjustedFontSize = Math.max(initialFontSize * adjustmentFactor, 6);
       document.documentElement.style.setProperty('--aa-font-size', `${adjustedFontSize}px`);
@@ -1062,44 +1062,44 @@ class UIManager {
   adjustMobileAASize() {
     const remoteAA = this.elements.remoteAA;
     const localAA = this.elements.localAA;
-    
+
     // 実際のDOM要素から利用可能高さを計算
     const h1 = document.querySelector('h1');
     const controls = document.querySelector('.controls');
     const container = document.querySelector('.container');
-    
+
     const h1Height = h1 ? h1.offsetHeight + parseInt(getComputedStyle(h1).marginTop) + parseInt(getComputedStyle(h1).marginBottom) : 0;
     const controlsHeight = controls ? controls.offsetHeight : 0;
     const containerPadding = container ? parseInt(getComputedStyle(container).paddingTop) + parseInt(getComputedStyle(container).paddingBottom) : 0;
-    
+
     // Visual Viewport API対応（iOS キーボード表示時）
     const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const availableHeight = viewportHeight - h1Height - controlsHeight - containerPadding;
-    
+
     // chat-area内の要素（mobile-status、h3タイトル）を考慮
     const mobileStatus = document.querySelector('.mobile-status');
     const mobileStatusHeight = mobileStatus ? mobileStatus.offsetHeight : 0;
-    
+
     const h3Elements = document.querySelectorAll('.video-container h3');
     let totalTitleHeight = 0;
     h3Elements.forEach(h3 => {
       if (h3) totalTitleHeight += h3.offsetHeight;
     });
-    
+
     const availableAAHeight = availableHeight - mobileStatusHeight - totalTitleHeight;
-    
+
     // より大胆なサイズ計算を試す
     const idealFontSize = availableAAHeight / (60 * 2.5); // 2.5倍で計算（2つのAAエリア分）
-    
+
     // 幅の制約もチェック
     const containerWidth = window.innerWidth;
     const widthMultiplier = 80 * 0.6 + 79 * 0.4; // = 79.6
     const maxFontSizeByWidth = (containerWidth - 10) / widthMultiplier; // 10px マージン
-    
+
     // 最終的なフォントサイズ
     let fontSize = Math.min(idealFontSize, maxFontSizeByWidth);
     fontSize = Math.max(4, Math.min(12, fontSize)); // 4-12pxの範囲（モバイル用に制限）
-    
+
     console.log('モバイルAAサイズ計算:', {
       viewportHeight,
       h1Height,
@@ -1109,12 +1109,12 @@ class UIManager {
       availableAAHeight,
       fontSize
     });
-    
-    
+
+
     // CSS変数を設定（両方同じサイズ）
     document.documentElement.style.setProperty('--remote-aa-font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
-      
+
     console.log('モバイルAAサイズ調整:', fontSize + 'px', {
       availableHeight,
       availableAAHeight,
@@ -1164,7 +1164,7 @@ class UIManager {
     // それ以外は編集可能
     const shouldLock = this.isKeywordFromURL || sessionActive;
     this.elements.keyword.readOnly = shouldLock;
-    
+
     console.log('キーワード入力状態:', shouldLock ? 'ロック' : '編集可能', {
       fromURL: this.isKeywordFromURL,
       sessionActive: sessionActive
@@ -1214,7 +1214,7 @@ class AAChat {
     this.webRTCManager = new WebRTCManager();
     this.sessionManager = new SessionManager();
     this.signalingManager = new SignalingManager();
-    
+
     // Initialize canvas and converters
     this.ctx = this.elements.canvas.getContext('2d');
     this.asciiConverter = new ASCIIConverter(this.elements.canvas, this.ctx);
@@ -1253,14 +1253,41 @@ const uiManager = aaChat.getUIManager();
 const elements = aaChat.getElements();
 const ctx = aaChat.ctx;
 
-// Backward compatibility - expose state variables as globals
-let keywordTimer = null;
-let timerInterval = null;
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 5;
-let reconnectInterval = null;
-let activePollingIntervals = [];
-let isWaitingForGuest = false;
+// Backward compatibility - expose state variables as getters/setters
+Object.defineProperty(window, 'keywordTimer', {
+  get: () => aaChat.keywordTimer,
+  set: (value) => { aaChat.keywordTimer = value; }
+});
+
+Object.defineProperty(window, 'timerInterval', {
+  get: () => aaChat.timerInterval,
+  set: (value) => { aaChat.timerInterval = value; }
+});
+
+Object.defineProperty(window, 'reconnectAttempts', {
+  get: () => aaChat.reconnectAttempts,
+  set: (value) => { aaChat.reconnectAttempts = value; }
+});
+
+Object.defineProperty(window, 'maxReconnectAttempts', {
+  get: () => aaChat.maxReconnectAttempts,
+  set: (value) => { aaChat.maxReconnectAttempts = value; }
+});
+
+Object.defineProperty(window, 'reconnectInterval', {
+  get: () => aaChat.reconnectInterval,
+  set: (value) => { aaChat.reconnectInterval = value; }
+});
+
+Object.defineProperty(window, 'activePollingIntervals', {
+  get: () => aaChat.activePollingIntervals,
+  set: (value) => { aaChat.activePollingIntervals = value; }
+});
+
+Object.defineProperty(window, 'isWaitingForGuest', {
+  get: () => aaChat.isWaitingForGuest,
+  set: (value) => { aaChat.isWaitingForGuest = value; }
+});
 
 
 // デバイス選択肢を更新
@@ -1268,11 +1295,11 @@ function updateDeviceSelects() {
   // デスクトップ用
   updateSelectOptions(elements.videoSelect, mediaManager.getAvailableVideoDevices(), 'カメラ');
   updateSelectOptions(elements.audioSelect, mediaManager.getAvailableAudioDevices(), 'マイク');
-  
+
   // ダイアログ用
   updateSelectOptions(elements.videoSelectDialog, mediaManager.getAvailableVideoDevices(), 'カメラ');
   updateSelectOptions(elements.audioSelectDialog, mediaManager.getAvailableAudioDevices(), 'マイク');
-  
+
   // 現在の選択を保持
   if (mediaManager.selectedDeviceIds.video) {
     elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
@@ -1299,7 +1326,7 @@ async function playVideoSafely(videoElement, label) {
   return new Promise((resolve) => {
     const attemptPlay = () => {
       const playPromise = videoElement.play();
-      
+
       if (playPromise !== undefined) {
         playPromise.then(() => {
           console.log(`${label}ビデオ再生開始`);
@@ -1314,7 +1341,7 @@ async function playVideoSafely(videoElement, label) {
         resolve();
       }
     };
-    
+
     // ビデオが読み込まれるまで待機
     if (videoElement.readyState >= 2) {
       // 既に読み込み済み
@@ -1326,7 +1353,7 @@ async function playVideoSafely(videoElement, label) {
         attemptPlay();
       };
       videoElement.addEventListener('loadeddata', onLoadedData);
-      
+
       // タイムアウト処理（5秒後）
       setTimeout(() => {
         videoElement.removeEventListener('loadeddata', onLoadedData);
@@ -1341,812 +1368,811 @@ async function playVideoSafely(videoElement, label) {
 // ASCII変換処理は ASCIIConverter クラスに移動
 
 function stopAllPolling() {
-  activePollingIntervals.forEach(intervalId => clearInterval(intervalId));
-  activePollingIntervals = [];
+  aaChat.activePollingIntervals.forEach(intervalId => clearInterval(intervalId));
+  aaChat.activePollingIntervals = [];
   console.log('全ポーリング停止');
 }
 
 function addPollingInterval(intervalId) {
-  activePollingIntervals.push(intervalId);
+  aaChat.activePollingIntervals.push(intervalId);
 }
 
 
-  
-  async function hostSession() {
-    const keyword = elements.keyword.value.trim();
-    if (!keyword) {
-      alert('キーワードを入力してください');
-      return;
-    }
-    
-    if (!await mediaManager.startCamera()) return;
-    
-    sessionManager.startSession(true, keyword);
-    uiManager.updateStatus('接続準備中...');
-    uiManager.toggleButtons(false);
-    
-    // ASCII変換を開始（ホスト開始時に必要）
-    asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
-    
-    // セッショントークンは startSession で生成済み
-    
-    await webRTCManager.createPeerConnection(elements);
-    webRTCManager.setupDataChannel();
-    
-    // オファー作成時のオプションを追加
-    const offer = await webRTCManager.createOffer();
-    
-    console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
-    try {
-      await signalingManager.sendSignal(keyword, {
-        type: 'offer',
-        offer: offer,
-        token: sessionManager.sessionToken
-      });
-      console.log('オファー送信完了');
-    } catch (error) {
-      // 400エラーをチェック（既存ホストの検出）
-      if (error.message.includes('シグナル送信エラー')) {
-        try {
-          const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({type: 'offer', offer: offer, token: sessionToken})
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            if (errorText.includes('Another sender has been connected')) {
-              // 既存ホストが存在
-              const suggestedKeyword = Utility.generateSuggestedKeyword(keyword);
-              uiManager.updateStatus('エラー: このキーワードは既に使用されています');
-              
-              const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
+
+async function hostSession() {
+  const keyword = elements.keyword.value.trim();
+  if (!keyword) {
+    alert('キーワードを入力してください');
+    return;
+  }
+
+  if (!await mediaManager.startCamera()) return;
+
+  sessionManager.startSession(true, keyword);
+  uiManager.updateStatus('接続準備中...');
+  uiManager.toggleButtons(false);
+
+  // ASCII変換を開始（ホスト開始時に必要）
+  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+
+  // セッショントークンは startSession で生成済み
+
+  await webRTCManager.createPeerConnection(elements);
+  webRTCManager.setupDataChannel();
+
+  // オファー作成時のオプションを追加
+  const offer = await webRTCManager.createOffer();
+
+  console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
+  try {
+    await signalingManager.sendSignal(keyword, {
+      type: 'offer',
+      offer: offer,
+      token: sessionManager.sessionToken
+    });
+    console.log('オファー送信完了');
+  } catch (error) {
+    // 400エラーをチェック（既存ホストの検出）
+    if (error.message.includes('シグナル送信エラー')) {
+      try {
+        const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ type: 'offer', offer: offer, token: sessionToken })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          if (errorText.includes('Another sender has been connected')) {
+            // 既存ホストが存在
+            const suggestedKeyword = Utility.generateSuggestedKeyword(keyword);
+            uiManager.updateStatus('エラー: このキーワードは既に使用されています');
+
+            const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
               `以下のような別のキーワードを試してください：\n` +
               `• ${suggestedKeyword}\n` +
               `• ${keyword}-room\n` +
               `• ${keyword}${Math.floor(Math.random() * 100)}\n\n` +
               `または、そのセッションに「参加する」ボタンで参加することもできます。`;
-              
-              alert(message);
-              cleanup();
-              return;
-            }
+
+            alert(message);
+            cleanup();
+            return;
           }
-        } catch (checkError) {
-          console.log('既存ホスト確認エラー:', checkError.message);
         }
+      } catch (checkError) {
+        console.log('既存ホスト確認エラー:', checkError.message);
       }
-      
-      // その他のエラーの場合は表示して終了
-      uiManager.updateStatus('接続エラー: ' + error.message);
-      cleanup();
+    }
+
+    // その他のエラーの場合は表示して終了
+    uiManager.updateStatus('接続エラー: ' + error.message);
+    cleanup();
+    return;
+  }
+
+  uiManager.updateStatus('参加者を待っています...');
+  startKeywordTimer();
+
+  pollForAnswer();
+}
+
+async function restartHostSession() {
+  console.log('ホストセッション再開');
+
+  // 既存の接続をクリーンアップ
+  stopAllPolling();
+  webRTCManager.close();
+  // iceCandidates now managed by webRTCManager
+  sessionManager.connectionEstablished = false;
+  isWaitingForGuest = false;
+  sessionManager.sessionToken = Utility.generateSessionToken();
+
+  // ローカルストリームが存在しない場合は再取得
+  if (!mediaManager.getLocalStream()) {
+    console.log('ローカルストリームを再取得中...');
+    if (!await mediaManager.startCamera()) {
+      uiManager.updateStatus('カメラアクセスエラー');
       return;
     }
-    
-    uiManager.updateStatus('参加者を待っています...');
-    startKeywordTimer();
-    
-    pollForAnswer();
   }
-  
-  async function restartHostSession() {
-    console.log('ホストセッション再開');
-    
-    // 既存の接続をクリーンアップ
-    stopAllPolling();
-    webRTCManager.close();
-    // iceCandidates now managed by webRTCManager
-    sessionManager.connectionEstablished = false;
-    isWaitingForGuest = false;
-    sessionManager.sessionToken = Utility.generateSessionToken();
-    
-    // ローカルストリームが存在しない場合は再取得
-    if (!mediaManager.getLocalStream()) {
-      console.log('ローカルストリームを再取得中...');
-      if (!await mediaManager.startCamera()) {
-        uiManager.updateStatus('カメラアクセスエラー');
-        return;
+
+  // 新しいセッションを開始
+  await webRTCManager.createPeerConnection(elements);
+  webRTCManager.setupDataChannel();
+
+  const offer = await webRTCManager.createOffer();
+
+  // 新しいトークンでオファーを送信
+  console.log('新しいオファーを送信中:', sessionManager.currentKeyword, 'トークン:', sessionManager.sessionToken);
+  await signalingManager.sendSignal(sessionManager.currentKeyword, {
+    type: 'offer',
+    offer: offer,
+    token: sessionManager.sessionToken
+  });
+  console.log('新しいオファー送信完了');
+
+  uiManager.updateStatus('新しい参加者を待っています...');
+  pollForAnswer();
+}
+
+async function joinSession() {
+  const keyword = elements.keyword.value.trim();
+  if (!keyword) {
+    alert('キーワードを入力してください');
+    return;
+  }
+
+  // 既存ストリームのクリーンアップ
+  if (mediaManager.getLocalStream()) {
+    mediaManager.stopCamera();
+  }
+
+  if (!await mediaManager.startCamera()) return;
+
+  sessionManager.startSession(false, keyword);
+  uiManager.updateStatus('接続中...');
+  uiManager.toggleButtons(false);
+
+  // ASCII変換を再開（再参加時に必要）
+  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+
+  // シンプルにポーリングで検索
+  startJoinPolling();
+}
+
+async function pollForAnswer() {
+  const keyword = elements.keyword.value;
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  const pollInterval = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts || sessionManager.connectionEstablished) {
+      clearInterval(pollInterval);
+      if (!sessionManager.connectionEstablished) {
+        uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
       }
-    }
-    
-    // 新しいセッションを開始
-    await webRTCManager.createPeerConnection(elements);
-    webRTCManager.setupDataChannel();
-    
-    const offer = await webRTCManager.createOffer();
-    
-    // 新しいトークンでオファーを送信
-    console.log('新しいオファーを送信中:', sessionManager.currentKeyword, 'トークン:', sessionManager.sessionToken);
-    await signalingManager.sendSignal(sessionManager.currentKeyword, {
-      type: 'offer',
-      offer: offer,
-      token: sessionManager.sessionToken
-    });
-    console.log('新しいオファー送信完了');
-    
-    uiManager.updateStatus('新しい参加者を待っています...');
-    pollForAnswer();
-  }
-  
-  async function joinSession() {
-    const keyword = elements.keyword.value.trim();
-    if (!keyword) {
-      alert('キーワードを入力してください');
       return;
     }
-    
-    // 既存ストリームのクリーンアップ
-    if (mediaManager.getLocalStream()) {
-      mediaManager.stopCamera();
-    }
-    
-    if (!await mediaManager.startCamera()) return;
-    
-    sessionManager.startSession(false, keyword);
-    uiManager.updateStatus('接続中...');
-    uiManager.toggleButtons(false);
-    
-    // ASCII変換を再開（再参加時に必要）
-    asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
-    
-    // シンプルにポーリングで検索
-    startJoinPolling();
-  }
-  
-  async function pollForAnswer() {
-    const keyword = elements.keyword.value;
-    let attempts = 0;
-    const maxAttempts = 30;
-    
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
-        clearInterval(pollInterval);
-        if (!sessionManager.connectionEstablished) {
-          uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
-        }
-        return;
-      }
-      
-      try {
-        // トークンベースのパスと旧形式の両方をチェック
-        const answerPath = sessionManager.sessionToken ? 
-        `${keyword}/${sessionManager.sessionToken}/answer` : 
+
+    try {
+      // トークンベースのパスと旧形式の両方をチェック
+      const answerPath = sessionManager.sessionToken ?
+        `${keyword}/${sessionManager.sessionToken}/answer` :
         `${keyword}-answer`;
-        
-        const signal = await signalingManager.receiveSignal(answerPath);
-        if (signal && signal.type === 'answer') {
-          clearInterval(pollInterval);
-          uiManager.updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
-          await webRTCManager.setRemoteDescription(signal.answer);
-          pollForIceCandidates();
-        }
-      } catch (error) {
-        // 応答待ち
-      }
-    }, 2000);
-    
-    addPollingInterval(pollInterval);
-  }
-  
-  async function startJoinPolling() {
-    const keyword = sessionManager.currentKeyword;
-    let attempts = 0;
-    const maxAttempts = 30;
-    
-    uiManager.updateStatus('オファーを検索しています...');
-    
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
+
+      const signal = await signalingManager.receiveSignal(answerPath);
+      if (signal && signal.type === 'answer') {
         clearInterval(pollInterval);
-        if (!sessionManager.connectionEstablished) {
-          uiManager.updateStatus('タイムアウト: セッションが見つかりませんでした');
-          cleanup();
-        }
-        return;
+        uiManager.updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
+        await webRTCManager.setRemoteDescription(signal.answer);
+        pollForIceCandidates();
       }
-      
-      try {
-        // シンプルに基本キーワードのみを検索
-        console.log('オファーを検索中:', keyword);
-        const signal = await signalingManager.receiveSignal(keyword);
-        
-        if (signal && signal.type === 'offer') {
-          clearInterval(pollInterval);
-          uiManager.updateStatus('オファー受信 - 応答を準備中...');
-          
-          // ホストからのトークンを保存
-          if (signal.token) {
-            sessionManager.sessionToken = signal.token;
-            console.log('セッショントークン受信:', sessionManager.sessionToken);
-          }
-          
-          await webRTCManager.createPeerConnection(elements);
-          webRTCManager.setupDataChannel();
-          
-          await webRTCManager.setRemoteDescription(signal.offer);
-          uiManager.updateStatus('応答を作成中...');
-          const answer = await webRTCManager.createAnswer();
-          
-          // トークンを使用した安全なパスで応答
-          const answerPath = sessionManager.sessionToken ? 
-          `${keyword}/${sessionManager.sessionToken}/answer` : 
-          `${keyword}-answer`;
-          
-          uiManager.updateStatus('応答を送信中...');
-          await signalingManager.sendSignal(answerPath, {
-            type: 'answer',
-            answer: answer
-          });
-          
-          uiManager.updateStatus('ICE候補を交換中...');
-          pollForIceCandidates();
-        }
-      } catch (error) {
-        console.log('参加ポーリングエラー:', error.message);
-      }
-    }, 2000);
-    
-    addPollingInterval(pollInterval);
-  }
-  
-  async function pollForIceCandidates() {
-    const keyword = sessionManager.currentKeyword || elements.keyword.value;
-    const targetKey = sessionManager.sessionToken ? 
-    `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'guest' : 'host'}` :
-    `${keyword}-ice-${sessionManager.isHost ? 'guest' : 'host'}`;
-    console.log('ICE候補ポーリング開始:', targetKey);
-    
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
-        console.log('ICE候補ポーリング終了');
-        clearInterval(pollInterval);
-        return;
-      }
-      
-      try {
-        const signal = await signalingManager.receiveSignal(targetKey);
-        if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
-          console.log('ICE候補受信:', signal.candidates.length, '個');
-          clearInterval(pollInterval);
-          uiManager.updateStatus('ICE候補を受信 - 接続を確立中...');
-          for (const candidate of signal.candidates) {
-            console.log('ICE候補追加:', candidate.candidate ? candidate.candidate.split(' ')[7] : 'unknown');
-            try {
-              await webRTCManager.addIceCandidate(candidate);
-            } catch (error) {
-              console.log('ICE候補追加エラー:', error.message);
-            }
-          }
-          console.log('ICE候補追加完了');
-          
-          // ICE候補追加後、接続状態をチェック
-          setTimeout(async () => {
-            const currentState = webRTCManager.getPeerConnection()?.connectionState;
-            console.log('ICE候補追加後の接続状態:', currentState);
-            
-            if (currentState === 'connected') {
-              await updateConnectionInfo(true);
-            } else {
-              uiManager.updateStatus('接続を確立中...');
-            }
-          }, 1000);
-        }
-      } catch (error) {
-        console.log('ICE候補受信エラー:', error.message);
-      }
-    }, 2000);
-    
-    addPollingInterval(pollInterval);
-  }
-  
-  function startKeywordTimer() {
-    // sessionStartTime now managed by sessionManager
-    updateTimer();
-    
-    keywordTimer = setTimeout(() => {
-      if (!sessionManager.sessionActive) {
-        uiManager.updateStatus('キーワードの有効期限が切れました');
+    } catch (error) {
+      // 応答待ち
+    }
+  }, 2000);
+
+  addPollingInterval(pollInterval);
+}
+
+async function startJoinPolling() {
+  const keyword = sessionManager.currentKeyword;
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  uiManager.updateStatus('オファーを検索しています...');
+
+  const pollInterval = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts || sessionManager.connectionEstablished) {
+      clearInterval(pollInterval);
+      if (!sessionManager.connectionEstablished) {
+        uiManager.updateStatus('タイムアウト: セッションが見つかりませんでした');
         cleanup();
       }
-    }, 10 * 60 * 1000);
-    
-    timerInterval = setInterval(() => {
-      if (!sessionManager.startTime) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        return;
+      return;
+    }
+
+    try {
+      // シンプルに基本キーワードのみを検索
+      console.log('オファーを検索中:', keyword);
+      const signal = await signalingManager.receiveSignal(keyword);
+
+      if (signal && signal.type === 'offer') {
+        clearInterval(pollInterval);
+        uiManager.updateStatus('オファー受信 - 応答を準備中...');
+
+        // ホストからのトークンを保存
+        if (signal.token) {
+          sessionManager.sessionToken = signal.token;
+          console.log('セッショントークン受信:', sessionManager.sessionToken);
+        }
+
+        await webRTCManager.createPeerConnection(elements);
+        webRTCManager.setupDataChannel();
+
+        await webRTCManager.setRemoteDescription(signal.offer);
+        uiManager.updateStatus('応答を作成中...');
+        const answer = await webRTCManager.createAnswer();
+
+        // トークンを使用した安全なパスで応答
+        const answerPath = sessionManager.sessionToken ?
+          `${keyword}/${sessionManager.sessionToken}/answer` :
+          `${keyword}-answer`;
+
+        uiManager.updateStatus('応答を送信中...');
+        await signalingManager.sendSignal(answerPath, {
+          type: 'answer',
+          answer: answer
+        });
+
+        uiManager.updateStatus('ICE候補を交換中...');
+        pollForIceCandidates();
       }
-      updateTimer();
-    }, 1000);
-  }
-  
-  function updateTimer() {
-    if (!sessionManager.startTime) return;
-    
-    const elapsed = sessionManager.getSessionDuration();
-    const remaining = sessionManager.getRemainingTime();
-    
-    if (!sessionManager.connectionEstablished && remaining > 0) {
-      const minutes = Math.floor(remaining / 60);
-      const seconds = remaining % 60;
-      const timerText = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-      elements.timer.textContent = timerText;
-      elements.timer2.textContent = timerText;
-    } else {
-      elements.timer.textContent = '';
-      elements.timer2.textContent = '';
+    } catch (error) {
+      console.log('参加ポーリングエラー:', error.message);
     }
-  }
-  
-  function clearKeywordTimer() {
-    if (keywordTimer) {
-      clearTimeout(keywordTimer);
-      keywordTimer = null;
+  }, 2000);
+
+  addPollingInterval(pollInterval);
+}
+
+async function pollForIceCandidates() {
+  const keyword = sessionManager.currentKeyword || elements.keyword.value;
+  const targetKey = sessionManager.sessionToken ?
+    `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'guest' : 'host'}` :
+    `${keyword}-ice-${sessionManager.isHost ? 'guest' : 'host'}`;
+  console.log('ICE候補ポーリング開始:', targetKey);
+
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  const pollInterval = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts || sessionManager.connectionEstablished) {
+      console.log('ICE候補ポーリング終了');
+      clearInterval(pollInterval);
+      return;
     }
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
+
+    try {
+      const signal = await signalingManager.receiveSignal(targetKey);
+      if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
+        console.log('ICE候補受信:', signal.candidates.length, '個');
+        clearInterval(pollInterval);
+        uiManager.updateStatus('ICE候補を受信 - 接続を確立中...');
+        for (const candidate of signal.candidates) {
+          console.log('ICE候補追加:', candidate.candidate ? candidate.candidate.split(' ')[7] : 'unknown');
+          try {
+            await webRTCManager.addIceCandidate(candidate);
+          } catch (error) {
+            console.log('ICE候補追加エラー:', error.message);
+          }
+        }
+        console.log('ICE候補追加完了');
+
+        // ICE候補追加後、接続状態をチェック
+        setTimeout(async () => {
+          const currentState = webRTCManager.getPeerConnection()?.connectionState;
+          console.log('ICE候補追加後の接続状態:', currentState);
+
+          if (currentState === 'connected') {
+            await updateConnectionInfo(true);
+          } else {
+            uiManager.updateStatus('接続を確立中...');
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      console.log('ICE候補受信エラー:', error.message);
     }
+  }, 2000);
+
+  addPollingInterval(pollInterval);
+}
+
+function startKeywordTimer() {
+  // sessionStartTime now managed by sessionManager
+  updateTimer();
+
+  aaChat.keywordTimer = setTimeout(() => {
+    if (!sessionManager.sessionActive) {
+      uiManager.updateStatus('キーワードの有効期限が切れました');
+      cleanup();
+    }
+  }, 10 * 60 * 1000);
+
+  aaChat.timerInterval = setInterval(() => {
+    if (!sessionManager.startTime) {
+      clearInterval(aaChat.timerInterval);
+      aaChat.timerInterval = null;
+      return;
+    }
+    updateTimer();
+  }, 1000);
+}
+
+function updateTimer() {
+  if (!sessionManager.startTime) return;
+
+  const elapsed = sessionManager.getSessionDuration();
+  const remaining = sessionManager.getRemainingTime();
+
+  if (!sessionManager.connectionEstablished && remaining > 0) {
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    const timerText = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+    elements.timer.textContent = timerText;
+    elements.timer2.textContent = timerText;
+  } else {
     elements.timer.textContent = '';
     elements.timer2.textContent = '';
   }
-  
-  
-  
-  function handleDisconnect() {
-    clearReconnectInterval();
-    if (sessionManager.isHost) {
-      uiManager.updateStatus('セッション終了');
-    } else {
-      uiManager.updateStatus('ホストが退室しました');
-    }
-    cleanup();
+}
+
+function clearKeywordTimer() {
+  if (aaChat.keywordTimer) {
+    clearTimeout(aaChat.keywordTimer);
+    aaChat.keywordTimer = null;
   }
-  
-  function clearReconnectInterval() {
-    if (reconnectInterval) {
-      clearInterval(reconnectInterval);
-      reconnectInterval = null;
-    }
+  if (aaChat.timerInterval) {
+    clearInterval(aaChat.timerInterval);
+    aaChat.timerInterval = null;
   }
-  
-  function leaveSession() {
-    uiManager.updateStatus('退室しました');
-    cleanup();
-    
-    // ページリロードではなく、状態をリセット
-    setTimeout(() => {
-      uiManager.updateStatus('未接続');
-      uiManager.toggleButtons(true);
-    }, 100);
+  elements.timer.textContent = '';
+  elements.timer2.textContent = '';
+}
+
+
+
+function handleDisconnect() {
+  clearReconnectInterval();
+  if (sessionManager.isHost) {
+    uiManager.updateStatus('セッション終了');
+  } else {
+    uiManager.updateStatus('ホストが退室しました');
   }
-  
-  function cleanup() {
-    stopAllPolling(); // 全ポーリング停止
-    
-    // 進行中のppng.io接続をキャンセル
-    signalingManager.abortCurrentRequest();
-    
-    // ASCII変換を停止
-    asciiConverter.stopConversion();
-    
-    webRTCManager.close();
-    
-    // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
-    if (mediaManager.getLocalStream()) {
-      mediaManager.stopCamera();
-      elements.localAA.textContent = '';
-      console.log('ローカルビデオストリーム停止');
-    }
-    
-    elements.remoteVideo.srcObject = null;
-    elements.remoteAA.textContent = '';
-    
-    // ホスト側でない場合のみローカルAAをクリア
-    if (!sessionManager.isHost) {
-      elements.localAA.textContent = '';
-    }
-    
-    // iceCandidates now managed by webRTCManager
-    reconnectAttempts = 0;
-    isWaitingForGuest = false;
-    
-    // ゲスト退室時はホスト状態を保持
-    if (!sessionManager.isHost) {
-      sessionManager.reset();
-    } else {
-      sessionManager.endSession();
-    }
-    
-    clearKeywordTimer();
-    clearReconnectInterval();
-    
+  cleanup();
+}
+
+function clearReconnectInterval() {
+  if (reconnectInterval) {
+    clearInterval(reconnectInterval);
+    reconnectInterval = null;
+  }
+}
+
+function leaveSession() {
+  uiManager.updateStatus('退室しました');
+  cleanup();
+
+  // ページリロードではなく、状態をリセット
+  setTimeout(() => {
+    uiManager.updateStatus('未接続');
     uiManager.toggleButtons(true);
+  }, 100);
+}
+
+function cleanup() {
+  stopAllPolling(); // 全ポーリング停止
+
+  // 進行中のppng.io接続をキャンセル
+  signalingManager.abortCurrentRequest();
+
+  // ASCII変換を停止
+  asciiConverter.stopConversion();
+
+  webRTCManager.close();
+
+  // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
+  if (mediaManager.getLocalStream()) {
+    mediaManager.stopCamera();
+    elements.localAA.textContent = '';
+    console.log('ローカルビデオストリーム停止');
   }
-  
-  function updateStatus(text) {
-    elements.statusText.textContent = text;
-    elements.statusText2.textContent = text;
+
+  elements.remoteVideo.srcObject = null;
+  elements.remoteAA.textContent = '';
+
+  // ホスト側でない場合のみローカルAAをクリア
+  if (!sessionManager.isHost) {
+    elements.localAA.textContent = '';
   }
-  
-  async function getConnectionType() {
-    if (!webRTCManager.getPeerConnection()) return null;
-    
-    try {
-      const stats = await webRTCManager.getPeerConnection().getStats();
-      let connectionType = '';
-      
-      stats.forEach(report => {
-        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-          const localCandidate = stats.get(report.localCandidateId);
-          const remoteCandidate = stats.get(report.remoteCandidateId);
-          
-          if (localCandidate && remoteCandidate) {
-            const localType = localCandidate.candidateType;
-            const remoteType = remoteCandidate.candidateType;
-            connectionType = `${localType} ↔ ${remoteType}`;
-            
-            console.log('接続方法:', connectionType);
-            console.log('ローカル:', localCandidate);
-            console.log('リモート:', remoteCandidate);
-          }
-        }
-      });
-      
-      return connectionType || null;
-    } catch (err) {
-      console.log('Stats取得エラー:', err);
-      return null;
-    }
+
+  // iceCandidates now managed by webRTCManager
+  reconnectAttempts = 0;
+  isWaitingForGuest = false;
+
+  // ゲスト退室時はホスト状態を保持
+  if (!sessionManager.isHost) {
+    sessionManager.reset();
+  } else {
+    sessionManager.endSession();
   }
-  
-  async function updateConnectionInfo(shouldUpdateStatus = false) {
-    if (!webRTCManager.getPeerConnection()) return;
-    
-    const connectionState = webRTCManager.getPeerConnection()?.connectionState;
-    const iceConnectionState = webRTCManager.getPeerConnection()?.iceConnectionState;
-    const iceGatheringState = webRTCManager.getPeerConnection()?.iceGatheringState;
-    
-    if (connectionState === 'connected') {
-      const connectionType = await getConnectionType();
-      
-      if (connectionType) {
-        if (shouldUpdateStatus) {
-          uiManager.updateStatus(`接続完了 (${connectionType})`);
+
+  clearKeywordTimer();
+  clearReconnectInterval();
+
+  uiManager.toggleButtons(true);
+}
+
+function updateStatus(text) {
+  elements.statusText.textContent = text;
+  elements.statusText2.textContent = text;
+}
+
+async function getConnectionType() {
+  if (!webRTCManager.getPeerConnection()) return null;
+
+  try {
+    const stats = await webRTCManager.getPeerConnection().getStats();
+    let connectionType = '';
+
+    stats.forEach(report => {
+      if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+        const localCandidate = stats.get(report.localCandidateId);
+        const remoteCandidate = stats.get(report.remoteCandidateId);
+
+        if (localCandidate && remoteCandidate) {
+          const localType = localCandidate.candidateType;
+          const remoteType = remoteCandidate.candidateType;
+          connectionType = `${localType} ↔ ${remoteType}`;
+
+          console.log('接続方法:', connectionType);
+          console.log('ローカル:', localCandidate);
+          console.log('リモート:', remoteCandidate);
         }
-      } else {
-        if (shouldUpdateStatus) {
-          uiManager.updateStatus('接続完了');
-        }
+      }
+    });
+
+    return connectionType || null;
+  } catch (err) {
+    console.log('Stats取得エラー:', err);
+    return null;
+  }
+}
+
+async function updateConnectionInfo(shouldUpdateStatus = false) {
+  if (!webRTCManager.getPeerConnection()) return;
+
+  const connectionState = webRTCManager.getPeerConnection()?.connectionState;
+  const iceConnectionState = webRTCManager.getPeerConnection()?.iceConnectionState;
+  const iceGatheringState = webRTCManager.getPeerConnection()?.iceGatheringState;
+
+  if (connectionState === 'connected') {
+    const connectionType = await getConnectionType();
+
+    if (connectionType) {
+      if (shouldUpdateStatus) {
+        uiManager.updateStatus(`接続完了 (${connectionType})`);
       }
     } else {
-      // 詳細な接続情報を表示
-      const info = `${connectionState} | ice: ${iceConnectionState} | gathering: ${iceGatheringState}`;
-      elements.timer.textContent = info;
-      elements.timer2.textContent = info;
-    }
-  }
-  
-  // ユーザー操作によるビデオ再生を許可
-  function enableAutoplayAfterUserGesture() {
-    // すべてのビデオ要素で自動再生を試行
-    playVideoSafely(elements.localVideo, 'ローカル（ユーザー操作後）');
-    playVideoSafely(elements.remoteVideo, 'リモート（ユーザー操作後）');
-  }
-  
-  elements.hostBtn.addEventListener('click', () => {
-    enableAutoplayAfterUserGesture();
-    hostSession();
-  });
-  
-  elements.joinBtn.addEventListener('click', () => {
-    enableAutoplayAfterUserGesture();
-    joinSession();
-  });
-  
-  elements.leaveBtn.addEventListener('click', leaveSession);
-  
-  // URLパラメータからキーワードを自動入力
-  // クリアボタンのイベントリスナー
-  elements.clearBtn.addEventListener('click', () => {
-    // パラメータなしのURLに遷移
-    window.location.href = window.location.pathname;
-  });
-  
-  // 文字サイズ自動調整関数
-  function adjustAAFontSize() {
-    const aaDisplays = document.querySelectorAll('.aa-display');
-    const containerWidth = window.innerWidth;
-    const containerHeight = window.innerHeight;
-    
-    // モバイルの場合は個別に調整
-    if (containerWidth <= 768) {
-      adjustMobileAASize();
-      return;
-    }
-    
-    // タブレットの場合は画面に収まるように調整
-    if (containerWidth <= 1200) {
-      // 縦向きか横向きかを判定
-      const isPortrait = containerHeight > containerWidth;
-      
-      let availableWidth, availableHeight, fontSizeByWidth, fontSizeByHeight;
-      
-      if (isPortrait) {
-        // 縦向きタブレット：縦並びレイアウト
-        availableWidth = containerWidth - 40; // 1つのAAエリア + マージン
-        availableHeight = (containerHeight - 160) / 2; // 2つのAAエリア + コントロール
-        fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
-        fontSizeByHeight = availableHeight / 60;
-      } else {
-        // 横向きタブレット：横並びレイアウト
-        availableWidth = (containerWidth - 60) / 2; // 2つのAAエリア + マージン
-        availableHeight = containerHeight - 120; // コントロール分を除く
-        fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
-        fontSizeByHeight = availableHeight / 60;
+      if (shouldUpdateStatus) {
+        uiManager.updateStatus('接続完了');
       }
-      
-      const tabletFontSize = Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
-      document.documentElement.style.setProperty('--aa-font-size', `${tabletFontSize}px`);
-      console.log('タブレットAAサイズ調整:', tabletFontSize + 'px', {
-        isPortrait,
-        availableWidth,
-        availableHeight,
-        fontSizeByWidth,
-        fontSizeByHeight
-      });
-      return;
     }
-    
-    // デスクトップの場合は画面サイズに基づいて計算
-    let fontSize;
-    
-    if (containerWidth > 1200) {
-      // 横並びレイアウト
-      const widthBasedSize = (containerWidth - 50) / (80 * 1.0 * 2);
-      const heightBasedSize = (containerHeight - 100) / 60;
-      fontSize = Math.min(widthBasedSize, heightBasedSize, 20);
-    } else if (containerWidth > 768) {
-      // 縦並びレイアウト
-      const widthBasedSize = (containerWidth - 30) / (80 * 1.0);
-      const heightBasedSize = (containerHeight - 150) / (60 * 2);
-      fontSize = Math.min(widthBasedSize, heightBasedSize, 18);
-    }
-    
-    fontSize = Math.max(fontSize, 8); // 最小8px
-    
-    // CSSカスタムプロパティで動的に設定
-    document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
-    console.log('AA表示フォントサイズ調整:', fontSize + 'px');
+  } else {
+    // 詳細な接続情報を表示
+    const info = `${connectionState} | ice: ${iceConnectionState} | gathering: ${iceGatheringState}`;
+    elements.timer.textContent = info;
+    elements.timer2.textContent = info;
   }
-  
-  // モバイル用のAAサイズ調整
-  function adjustMobileAASize() {
-    // iOSキーボード対応：画面の実際のサイズではなく、ビューポートサイズを使用
-    const containerHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const containerWidth = window.innerWidth;
-    
-    // キーボードが表示されている場合の検出
-    const isKeyboardVisible = window.visualViewport && window.visualViewport.height < window.screen.height * 0.75;
-    
-    // キーボード表示時は基準サイズを固定値で使用
-    const baseHeight = isKeyboardVisible ? window.screen.height : containerHeight;
-    const availableHeight = baseHeight - 120; // コントロールとタイトルを除く
-    const statusHeight = 50; // ステータス表示分
-    
-    // 相手のAAは40vhで固定（基準サイズに対して）
-    const remoteHeight = baseHeight * 0.4;
-    const localAvailableHeight = availableHeight - remoteHeight - statusHeight;
-    
-    // 相手のAAサイズ（40vhに収まるように計算）
-    const remoteMaxHeight = baseHeight * 0.4;
-    const remoteFontSize = Math.max(4, Math.min(10, remoteMaxHeight / 60, containerWidth * 0.012));
-    
-    // 自分のAAサイズ（基本的に相手と同じサイズ、スペース不足時のみ縮小）
-    const idealLocalFontSize = remoteFontSize; // 相手と同じサイズを目標
-    const maxLocalFontSize = Math.min(localAvailableHeight / 60, containerWidth * 0.01);
-    const localFontSize = Math.max(3, Math.min(idealLocalFontSize, maxLocalFontSize));
-    
-    // 相手のAAサイズ設定
-    document.documentElement.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
-    document.documentElement.style.setProperty('--aa-font-size', `${remoteFontSize}px`);
-    
-    // 自分のAAだけ別のサイズに設定
-    const localAA = document.getElementById('localAA');
-    if (localAA) {
-      localAA.style.fontSize = `${localFontSize}px`;
-      localAA.style.letterSpacing = `${localFontSize * 0.4}px`;
-      localAA.style.width = `${80 * localFontSize * 1.0 + 79 * localFontSize * 0.4}px`;
-      localAA.style.height = `${60 * localFontSize}px`;
-      
-      // 必要に応じてスケール調整
-      const maxWidth = containerWidth - 4;
-      const calculatedWidth = 80 * localFontSize * 1.0 + 79 * localFontSize * 0.4;
-      const maxHeight = localAvailableHeight - 10;
-      const calculatedHeight = 60 * localFontSize;
-      
-      let scale = 1;
-      if (calculatedWidth > maxWidth) {
-        scale = Math.min(scale, maxWidth / calculatedWidth);
-      }
-      if (calculatedHeight > maxHeight) {
-        scale = Math.min(scale, maxHeight / calculatedHeight);
-      }
-      
-      localAA.style.transform = `scale(${scale})`;
+}
+
+// ユーザー操作によるビデオ再生を許可
+function enableAutoplayAfterUserGesture() {
+  // すべてのビデオ要素で自動再生を試行
+  playVideoSafely(elements.localVideo, 'ローカル（ユーザー操作後）');
+  playVideoSafely(elements.remoteVideo, 'リモート（ユーザー操作後）');
+}
+
+elements.hostBtn.addEventListener('click', () => {
+  enableAutoplayAfterUserGesture();
+  hostSession();
+});
+
+elements.joinBtn.addEventListener('click', () => {
+  enableAutoplayAfterUserGesture();
+  joinSession();
+});
+
+elements.leaveBtn.addEventListener('click', leaveSession);
+
+// URLパラメータからキーワードを自動入力
+// クリアボタンのイベントリスナー
+elements.clearBtn.addEventListener('click', () => {
+  // パラメータなしのURLに遷移
+  window.location.href = window.location.pathname;
+});
+
+// 文字サイズ自動調整関数
+function adjustAAFontSize() {
+  const aaDisplays = document.querySelectorAll('.aa-display');
+  const containerWidth = window.innerWidth;
+  const containerHeight = window.innerHeight;
+
+  // モバイルの場合は個別に調整
+  if (containerWidth <= 768) {
+    adjustMobileAASize();
+    return;
+  }
+
+  // タブレットの場合は画面に収まるように調整
+  if (containerWidth <= 1200) {
+    // 縦向きか横向きかを判定
+    const isPortrait = containerHeight > containerWidth;
+
+    let availableWidth, availableHeight, fontSizeByWidth, fontSizeByHeight;
+
+    if (isPortrait) {
+      // 縦向きタブレット：縦並びレイアウト
+      availableWidth = containerWidth - 40; // 1つのAAエリア + マージン
+      availableHeight = (containerHeight - 160) / 2; // 2つのAAエリア + コントロール
+      fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
+      fontSizeByHeight = availableHeight / 60;
+    } else {
+      // 横向きタブレット：横並びレイアウト
+      availableWidth = (containerWidth - 60) / 2; // 2つのAAエリア + マージン
+      availableHeight = containerHeight - 120; // コントロール分を除く
+      fontSizeByWidth = availableWidth / (80 * 1.0 + 79 * 0.4);
+      fontSizeByHeight = availableHeight / 60;
     }
-    
-    console.log('モバイルAAサイズ調整:', {
-      remote: remoteFontSize + 'px',
-      local: localFontSize + 'px',
-      scale: localAA ? localAA.style.transform : 'none',
-      keyboardVisible: isKeyboardVisible,
-      baseHeight: baseHeight,
-      containerHeight: containerHeight
+
+    const tabletFontSize = Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
+    document.documentElement.style.setProperty('--aa-font-size', `${tabletFontSize}px`);
+    console.log('タブレットAAサイズ調整:', tabletFontSize + 'px', {
+      isPortrait,
+      availableWidth,
+      availableHeight,
+      fontSizeByWidth,
+      fontSizeByHeight
     });
+    return;
   }
-  
-  // リサイズイベントでフォントサイズ調整（スロットリング）
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
+
+  // デスクトップの場合は画面サイズに基づいて計算
+  let fontSize;
+
+  if (containerWidth > 1200) {
+    // 横並びレイアウト
+    const widthBasedSize = (containerWidth - 50) / (80 * 1.0 * 2);
+    const heightBasedSize = (containerHeight - 100) / 60;
+    fontSize = Math.min(widthBasedSize, heightBasedSize, 20);
+  } else if (containerWidth > 768) {
+    // 縦並びレイアウト
+    const widthBasedSize = (containerWidth - 30) / (80 * 1.0);
+    const heightBasedSize = (containerHeight - 150) / (60 * 2);
+    fontSize = Math.min(widthBasedSize, heightBasedSize, 18);
+  }
+
+  fontSize = Math.max(fontSize, 8); // 最小8px
+
+  // CSSカスタムプロパティで動的に設定
+  document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
+  console.log('AA表示フォントサイズ調整:', fontSize + 'px');
+}
+
+// モバイル用のAAサイズ調整
+function adjustMobileAASize() {
+  // iOSキーボード対応：画面の実際のサイズではなく、ビューポートサイズを使用
+  const containerHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const containerWidth = window.innerWidth;
+
+  // キーボードが表示されている場合の検出
+  const isKeyboardVisible = window.visualViewport && window.visualViewport.height < window.screen.height * 0.75;
+
+  // キーボード表示時は基準サイズを固定値で使用
+  const baseHeight = isKeyboardVisible ? window.screen.height : containerHeight;
+  const availableHeight = baseHeight - 120; // コントロールとタイトルを除く
+  const statusHeight = 50; // ステータス表示分
+
+  // 相手のAAは40vhで固定（基準サイズに対して）
+  const remoteHeight = baseHeight * 0.4;
+  const localAvailableHeight = availableHeight - remoteHeight - statusHeight;
+
+  // 相手のAAサイズ（40vhに収まるように計算）
+  const remoteMaxHeight = baseHeight * 0.4;
+  const remoteFontSize = Math.max(4, Math.min(10, remoteMaxHeight / 60, containerWidth * 0.012));
+
+  // 自分のAAサイズ（基本的に相手と同じサイズ、スペース不足時のみ縮小）
+  const idealLocalFontSize = remoteFontSize; // 相手と同じサイズを目標
+  const maxLocalFontSize = Math.min(localAvailableHeight / 60, containerWidth * 0.01);
+  const localFontSize = Math.max(3, Math.min(idealLocalFontSize, maxLocalFontSize));
+
+  // 相手のAAサイズ設定
+  document.documentElement.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
+  document.documentElement.style.setProperty('--aa-font-size', `${remoteFontSize}px`);
+
+  // 自分のAAだけ別のサイズに設定
+  const localAA = document.getElementById('localAA');
+  if (localAA) {
+    localAA.style.fontSize = `${localFontSize}px`;
+    localAA.style.letterSpacing = `${localFontSize * 0.4}px`;
+    localAA.style.width = `${80 * localFontSize * 1.0 + 79 * localFontSize * 0.4}px`;
+    localAA.style.height = `${60 * localFontSize}px`;
+
+    // 必要に応じてスケール調整
+    const maxWidth = containerWidth - 4;
+    const calculatedWidth = 80 * localFontSize * 1.0 + 79 * localFontSize * 0.4;
+    const maxHeight = localAvailableHeight - 10;
+    const calculatedHeight = 60 * localFontSize;
+
+    let scale = 1;
+    if (calculatedWidth > maxWidth) {
+      scale = Math.min(scale, maxWidth / calculatedWidth);
+    }
+    if (calculatedHeight > maxHeight) {
+      scale = Math.min(scale, maxHeight / calculatedHeight);
+    }
+
+    localAA.style.transform = `scale(${scale})`;
+  }
+
+  console.log('モバイルAAサイズ調整:', {
+    remote: remoteFontSize + 'px',
+    local: localFontSize + 'px',
+    scale: localAA ? localAA.style.transform : 'none',
+    keyboardVisible: isKeyboardVisible,
+    baseHeight: baseHeight,
+    containerHeight: containerHeight
+  });
+}
+
+// リサイズイベントでフォントサイズ調整（スロットリング）
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    uiManager.adjustAAFontSize();
+  }, 1000);
+});
+
+// Visual Viewport API対応（iOSキーボード表示時の対応）
+let viewportResizeTimeout;
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    clearTimeout(viewportResizeTimeout);
+    viewportResizeTimeout = setTimeout(() => {
       uiManager.adjustAAFontSize();
     }, 1000);
   });
-  
-  // Visual Viewport API対応（iOSキーボード表示時の対応）
-  let viewportResizeTimeout;
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      clearTimeout(viewportResizeTimeout);
-      viewportResizeTimeout = setTimeout(() => {
-        uiManager.adjustAAFontSize();
-      }, 1000);
-    });
-  }
-  
-  // ダイアログ制御
-  function openDeviceDialog() {
-    elements.deviceDialog.style.display = 'flex';
-  }
-  
-  function closeDeviceDialog() {
-    elements.deviceDialog.style.display = 'none';
-  }
-  
-  async function applyDeviceSelection() {
-    const newVideoDeviceId = elements.videoSelectDialog.value;
-    const newAudioDeviceId = elements.audioSelectDialog.value;
-    
-    // デバイス変更があるかチェック
-    const videoChanged = mediaManager.selectedDeviceIds.video !== newVideoDeviceId;
-    const audioChanged = mediaManager.selectedDeviceIds.audio !== newAudioDeviceId;
-    
-    if (!videoChanged && !audioChanged) {
-      closeDeviceDialog();
-      return;
-    }
-    
-    // 選択デバイスIDを更新
-    mediaManager.selectedDeviceIds.video = newVideoDeviceId;
-    mediaManager.selectedDeviceIds.audio = newAudioDeviceId;
-    
-    // デスクトップ用の選択も同期
-    elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
-    elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
-    
-    console.log('デバイス選択適用:', {
-      video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
-      audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text,
-      sessionActive: sessionManager.sessionActive
-    });
-    
-    // 通話中の場合はデバイスを切り替え
-    if (sessionManager.sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
-      try {
-        await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
-      } catch (error) {
-        console.error('通話中のデバイス切り替えエラー:', error);
-        alert('デバイスの切り替えに失敗しました: ' + error.message);
-      }
-    }
-    
+}
+
+// ダイアログ制御
+function openDeviceDialog() {
+  elements.deviceDialog.style.display = 'flex';
+}
+
+function closeDeviceDialog() {
+  elements.deviceDialog.style.display = 'none';
+}
+
+async function applyDeviceSelection() {
+  const newVideoDeviceId = elements.videoSelectDialog.value;
+  const newAudioDeviceId = elements.audioSelectDialog.value;
+
+  // デバイス変更があるかチェック
+  const videoChanged = mediaManager.selectedDeviceIds.video !== newVideoDeviceId;
+  const audioChanged = mediaManager.selectedDeviceIds.audio !== newAudioDeviceId;
+
+  if (!videoChanged && !audioChanged) {
     closeDeviceDialog();
+    return;
   }
-  
-  // イベントリスナー設定
-  elements.deviceBtn.addEventListener('click', openDeviceDialog);
-  elements.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
-  elements.closeDialog.addEventListener('click', closeDeviceDialog);
-  elements.applyDevices.addEventListener('click', applyDeviceSelection);
-  elements.refreshDevices.addEventListener('click', () => mediaManager.getAvailableDevices());
-  elements.refreshDevicesDialog.addEventListener('click', () => mediaManager.getAvailableDevices());
-  
-  // ヘルプダイアログのイベントリスナー
-  elements.helpBtn.addEventListener('click', () => {
-    elements.helpDialog.style.display = 'flex';
+
+  // 選択デバイスIDを更新
+  mediaManager.selectedDeviceIds.video = newVideoDeviceId;
+  mediaManager.selectedDeviceIds.audio = newAudioDeviceId;
+
+  // デスクトップ用の選択も同期
+  elements.videoSelect.value = mediaManager.selectedDeviceIds.video;
+  elements.audioSelect.value = mediaManager.selectedDeviceIds.audio;
+
+  console.log('デバイス選択適用:', {
+    video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
+    audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text,
+    sessionActive: sessionManager.sessionActive
   });
 
-  elements.mobileHelpBtn.addEventListener('click', () => {
-    elements.helpDialog.style.display = 'flex';
-  });
-  
-  elements.closeHelpDialog.addEventListener('click', () => {
-    elements.helpDialog.style.display = 'none';
-  });
-  
-  // ヘルプダイアログ外側クリックで閉じる
-  elements.helpDialog.addEventListener('click', (e) => {
-    if (e.target === elements.helpDialog) {
-      elements.helpDialog.style.display = 'none';
+  // 通話中の場合はデバイスを切り替え
+  if (sessionManager.sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
+    try {
+      await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
+    } catch (error) {
+      console.error('通話中のデバイス切り替えエラー:', error);
+      alert('デバイスの切り替えに失敗しました: ' + error.message);
     }
-  });
-  
-  // ダイアログ外クリックで閉じる
-  elements.deviceDialog.addEventListener('click', (e) => {
-    if (e.target === elements.deviceDialog) {
-      closeDeviceDialog();
-    }
-  });
-  
-  elements.videoSelect.addEventListener('change', () => {
-    if (mediaManager.getLocalStream()) {
-      console.log('ビデオデバイス変更:', elements.videoSelect.options[elements.videoSelect.selectedIndex].text);
-    }
-  });
-  
-  elements.audioSelect.addEventListener('change', () => {
-    if (mediaManager.getLocalStream()) {
-      console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
-    }
-  });
-  
-  // iOS キーボード対策
-  if (window.visualViewport) {
-    let initialViewportHeight = window.visualViewport.height;
-    let keyboardVisible = false;
-    
-    window.visualViewport.addEventListener('resize', () => {
-      const currentHeight = window.visualViewport.height;
-      const heightDifference = initialViewportHeight - currentHeight;
-      
-      // キーボード表示判定（高さが大幅に減った場合）
-      const wasKeyboardVisible = keyboardVisible;
-      keyboardVisible = heightDifference > 150; // 150px以上減った場合
-      
-      // キーボードが非表示になった時
-      if (wasKeyboardVisible && !keyboardVisible) {
-        // ズームリセット
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          // viewportを強制リセット
-          const viewport = document.querySelector('meta[name=viewport]');
-          if (viewport) {
-            viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-          }
-        }, 100);
-      }
-      
-      // AAサイズも再調整
-      if (!keyboardVisible) {
-        setTimeout(() => {
-          uiManager.adjustAAFontSize();
-        }, 200);
-      }
-    });
   }
-  
-  // ページ読み込み時に実行
-  uiManager.loadKeywordFromURL();
-  asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
-  uiManager.adjustAAFontSize();
-  mediaManager.getAvailableDevices();
-  
+
+  closeDeviceDialog();
+}
+
+// イベントリスナー設定
+elements.deviceBtn.addEventListener('click', openDeviceDialog);
+elements.mobileDeviceBtn.addEventListener('click', openDeviceDialog);
+elements.closeDialog.addEventListener('click', closeDeviceDialog);
+elements.applyDevices.addEventListener('click', applyDeviceSelection);
+elements.refreshDevices.addEventListener('click', () => mediaManager.getAvailableDevices());
+elements.refreshDevicesDialog.addEventListener('click', () => mediaManager.getAvailableDevices());
+
+// ヘルプダイアログのイベントリスナー
+elements.helpBtn.addEventListener('click', () => {
+  elements.helpDialog.style.display = 'flex';
+});
+
+elements.mobileHelpBtn.addEventListener('click', () => {
+  elements.helpDialog.style.display = 'flex';
+});
+
+elements.closeHelpDialog.addEventListener('click', () => {
+  elements.helpDialog.style.display = 'none';
+});
+
+// ヘルプダイアログ外側クリックで閉じる
+elements.helpDialog.addEventListener('click', (e) => {
+  if (e.target === elements.helpDialog) {
+    elements.helpDialog.style.display = 'none';
+  }
+});
+
+// ダイアログ外クリックで閉じる
+elements.deviceDialog.addEventListener('click', (e) => {
+  if (e.target === elements.deviceDialog) {
+    closeDeviceDialog();
+  }
+});
+
+elements.videoSelect.addEventListener('change', () => {
+  if (mediaManager.getLocalStream()) {
+    console.log('ビデオデバイス変更:', elements.videoSelect.options[elements.videoSelect.selectedIndex].text);
+  }
+});
+
+elements.audioSelect.addEventListener('change', () => {
+  if (mediaManager.getLocalStream()) {
+    console.log('音声デバイス変更:', elements.audioSelect.options[elements.audioSelect.selectedIndex].text);
+  }
+});
+
+// iOS キーボード対策
+if (window.visualViewport) {
+  let initialViewportHeight = window.visualViewport.height;
+  let keyboardVisible = false;
+
+  window.visualViewport.addEventListener('resize', () => {
+    const currentHeight = window.visualViewport.height;
+    const heightDifference = initialViewportHeight - currentHeight;
+
+    // キーボード表示判定（高さが大幅に減った場合）
+    const wasKeyboardVisible = keyboardVisible;
+    keyboardVisible = heightDifference > 150; // 150px以上減った場合
+
+    // キーボードが非表示になった時
+    if (wasKeyboardVisible && !keyboardVisible) {
+      // ズームリセット
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        // viewportを強制リセット
+        const viewport = document.querySelector('meta[name=viewport]');
+        if (viewport) {
+          viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        }
+      }, 100);
+    }
+
+    // AAサイズも再調整
+    if (!keyboardVisible) {
+      setTimeout(() => {
+        uiManager.adjustAAFontSize();
+      }, 200);
+    }
+  });
+}
+
+// ページ読み込み時に実行
+uiManager.loadKeywordFromURL();
+asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
+uiManager.adjustAAFontSize();
+mediaManager.getAvailableDevices();
