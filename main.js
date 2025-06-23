@@ -1253,43 +1253,6 @@ const uiManager = aaChat.getUIManager();
 const elements = aaChat.getElements();
 const ctx = aaChat.ctx;
 
-// Backward compatibility - expose state variables as getters/setters
-Object.defineProperty(window, 'keywordTimer', {
-  get: () => aaChat.keywordTimer,
-  set: (value) => { aaChat.keywordTimer = value; }
-});
-
-Object.defineProperty(window, 'timerInterval', {
-  get: () => aaChat.timerInterval,
-  set: (value) => { aaChat.timerInterval = value; }
-});
-
-Object.defineProperty(window, 'reconnectAttempts', {
-  get: () => aaChat.reconnectAttempts,
-  set: (value) => { aaChat.reconnectAttempts = value; }
-});
-
-Object.defineProperty(window, 'maxReconnectAttempts', {
-  get: () => aaChat.maxReconnectAttempts,
-  set: (value) => { aaChat.maxReconnectAttempts = value; }
-});
-
-Object.defineProperty(window, 'reconnectInterval', {
-  get: () => aaChat.reconnectInterval,
-  set: (value) => { aaChat.reconnectInterval = value; }
-});
-
-Object.defineProperty(window, 'activePollingIntervals', {
-  get: () => aaChat.activePollingIntervals,
-  set: (value) => { aaChat.activePollingIntervals = value; }
-});
-
-Object.defineProperty(window, 'isWaitingForGuest', {
-  get: () => aaChat.isWaitingForGuest,
-  set: (value) => { aaChat.isWaitingForGuest = value; }
-});
-
-
 // デバイス選択肢を更新
 function updateDeviceSelects() {
   // デスクトップ用
@@ -1465,7 +1428,7 @@ async function restartHostSession() {
   webRTCManager.close();
   // iceCandidates now managed by webRTCManager
   sessionManager.connectionEstablished = false;
-  isWaitingForGuest = false;
+  aaChat.isWaitingForGuest = false;
   sessionManager.sessionToken = Utility.generateSessionToken();
 
   // ローカルストリームが存在しない場合は再取得
@@ -1738,9 +1701,9 @@ function handleDisconnect() {
 }
 
 function clearReconnectInterval() {
-  if (reconnectInterval) {
-    clearInterval(reconnectInterval);
-    reconnectInterval = null;
+  if (aaChat.reconnectInterval) {
+    clearInterval(aaChat.reconnectInterval);
+    aaChat.reconnectInterval = null;
   }
 }
 
@@ -1782,8 +1745,8 @@ function cleanup() {
   }
 
   // iceCandidates now managed by webRTCManager
-  reconnectAttempts = 0;
-  isWaitingForGuest = false;
+  aaChat.reconnectAttempts = 0;
+  aaChat.isWaitingForGuest = false;
 
   // ゲスト退室時はホスト状態を保持
   if (!sessionManager.isHost) {
