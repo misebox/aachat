@@ -248,7 +248,12 @@ class MediaManager {
     const newStream = await navigator.mediaDevices.getUserMedia(constraints);
     
     // トラックを置換
-    const senders = webRTCManager.getPeerConnection().getSenders();
+    const pc = webRTCManager.getPeerConnection();
+    if (!pc) {
+      console.error('PeerConnection is not available');
+      return;
+    }
+    const senders = pc.getSenders();
     
     if (videoChanged) {
       const newVideoTrack = newStream.getVideoTracks()[0];
@@ -310,6 +315,54 @@ class MediaManager {
   }
 }
 
+// SessionManager class for session state management
+class SessionManager {
+  constructor() {
+    this.isHost = false;
+    this.sessionToken = null;
+    this.currentKeyword = null;
+    this.sessionActive = false;
+    this.startTime = null;
+    this.connectionEstablished = false;
+  }
+
+  reset() {
+    this.isHost = false;
+    this.sessionToken = null;
+    this.currentKeyword = null;
+    this.sessionActive = false;
+    this.startTime = null;
+    this.connectionEstablished = false;
+  }
+
+  startSession(isHost, keyword) {
+    this.isHost = isHost;
+    this.currentKeyword = keyword;
+    this.sessionActive = true;
+    this.startTime = Date.now();
+    this.sessionToken = Utility.generateSessionToken();
+  }
+
+  endSession() {
+    this.sessionActive = false;
+    this.connectionEstablished = false;
+  }
+
+  getSessionDuration() {
+    if (!this.startTime) return 0;
+    return Math.floor((Date.now() - this.startTime) / 1000);
+  }
+
+  isSessionExpired(maxDuration = 600) {
+    return this.getSessionDuration() >= maxDuration;
+  }
+
+  getRemainingTime(maxDuration = 600) {
+    const elapsed = this.getSessionDuration();
+    return Math.max(0, maxDuration - elapsed);
+  }
+}
+
 // WebRTCManager class for peer connection management
 class WebRTCManager {
   constructor() {
@@ -319,7 +372,7 @@ class WebRTCManager {
     this.iceGatheringTimeout = null;
   }
 
-  async createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal) {
+  async createPeerConnection(elements, updateStatus, sendSignal) {
     this.peerConnection = new RTCPeerConnection({ 
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
@@ -374,15 +427,15 @@ class WebRTCManager {
         this.iceGatheringTimeout = setTimeout(async () => {
           console.log('ICE候補収集タイムアウト. 候補数:', this.iceCandidates.length);
           if (this.iceCandidates.length > 0) {
-            const keyword = elements.keyword.value;
-            const iceKey = sessionToken ? 
-            `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
-            `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+            const keyword = sessionManager.currentKeyword || elements.keyword.value;
+            const iceKey = sessionManager.sessionToken ? 
+            `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
+            `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
             console.log('ICE候補送信:', iceKey);
             await sendSignal(iceKey, {
               type: 'ice-batch',
               candidates: this.iceCandidates,
-              isHost: isHost
+              isHost: sessionManager.isHost
             });
           }
         }, 3000);
@@ -391,31 +444,31 @@ class WebRTCManager {
         if (this.iceGatheringTimeout) clearTimeout(this.iceGatheringTimeout);
         console.log('ICE候補収集完了. 候補数:', this.iceCandidates.length);
         if (this.iceCandidates.length > 0) {
-          const keyword = elements.keyword.value;
-          const iceKey = sessionToken ? 
-          `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
-          `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+          const keyword = sessionManager.currentKeyword || elements.keyword.value;
+          const iceKey = sessionManager.sessionToken ? 
+          `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
+          `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
           console.log('ICE候補送信:', iceKey);
           await sendSignal(iceKey, {
             type: 'ice-batch',
             candidates: this.iceCandidates,
-            isHost: isHost
+            isHost: sessionManager.isHost
           });
         }
       }
     };
     
-    this.setupConnectionEventHandlers(isHost, updateStatus);
+    this.setupConnectionEventHandlers(updateStatus);
   }
 
-  setupConnectionEventHandlers(isHost, updateStatus) {
+  setupConnectionEventHandlers(updateStatus) {
     this.peerConnection.onconnectionstatechange = () => {
       console.log('接続状態:', this.peerConnection.connectionState);
       updateStatus(`接続状態: ${this.peerConnection.connectionState}`);
       
       if (this.peerConnection.connectionState === 'connected') {
-        sessionActive = true;
-        connectionEstablished = true;
+        sessionManager.sessionActive = true;
+        sessionManager.connectionEstablished = true;
         isWaitingForGuest = false;
         reconnectAttempts = 0;
         clearKeywordTimer();
@@ -425,12 +478,12 @@ class WebRTCManager {
         setTimeout(() => updateConnectionInfo(true), 1000);
       } else if (this.peerConnection.connectionState === 'disconnected' || 
         this.peerConnection.connectionState === 'failed') {
-          if (connectionEstablished) {
+          if (sessionManager.connectionEstablished) {
             // 一度接続した後の切断の場合
-            connectionEstablished = false;
-            sessionActive = false;
+            sessionManager.connectionEstablished = false;
+            sessionManager.sessionActive = false;
             
-            if (isHost) {
+            if (sessionManager.isHost) {
               // ホストは最初からやり直し
               updateStatus('参加者が退室しました。新しいセッションを開始中...');
               setTimeout(() => {
@@ -460,8 +513,8 @@ class WebRTCManager {
       };
   }
 
-  setupDataChannel(isHost) {
-    if (isHost) {
+  setupDataChannel() {
+    if (sessionManager.isHost) {
       this.dataChannel = this.peerConnection.createDataChannel('aa-data');
       this.setupDataChannelEvents();
     } else {
@@ -535,18 +588,13 @@ class WebRTCManager {
 // Global instances
 const mediaManager = new MediaManager();
 const webRTCManager = new WebRTCManager();
-let isHost = false;
-let sessionActive = false;
+const sessionManager = new SessionManager();
 let keywordTimer = null;
-let sessionStartTime = null;
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let reconnectInterval = null;
-let currentKeyword = null;
 let activePollingIntervals = [];
-let connectionEstablished = false;
 let isWaitingForGuest = false;
-let sessionToken = null;
 let currentAbortController = null;
 
 const elements = {
@@ -871,29 +919,26 @@ async function receiveSignal(keyword) {
       return;
     }
     
-    currentKeyword = keyword;
-    
     if (!await mediaManager.startCamera()) return;
     
-    isHost = true;
+    sessionManager.startSession(true, keyword);
     updateStatus('接続準備中...');
     toggleButtons(false);
     
-    // セッショントークンを生成
-    sessionToken = Utility.generateSessionToken();
+    // セッショントークンは startSession で生成済み
     
-    await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
-    webRTCManager.setupDataChannel(isHost);
+    await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+    webRTCManager.setupDataChannel();
     
     // オファー作成時のオプションを追加
     const offer = await webRTCManager.createOffer();
     
-    console.log('オファーを送信中:', keyword, 'トークン:', sessionToken);
+    console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
     try {
       await sendSignal(keyword, {
         type: 'offer',
         offer: offer,
-        token: sessionToken
+        token: sessionManager.sessionToken
       });
       console.log('オファー送信完了');
     } catch (error) {
@@ -947,14 +992,11 @@ async function receiveSignal(keyword) {
     
     // 既存の接続をクリーンアップ
     stopAllPolling();
-    if (peerConnection) {
-      webRTCManager.close();
-      peerConnection = null;
-    }
+    webRTCManager.close();
     // iceCandidates now managed by webRTCManager
-    connectionEstablished = false;
+    sessionManager.connectionEstablished = false;
     isWaitingForGuest = false;
-    sessionToken = Utility.generateSessionToken();
+    sessionManager.sessionToken = Utility.generateSessionToken();
     
     // ローカルストリームが存在しない場合は再取得
     if (!mediaManager.getLocalStream()) {
@@ -966,17 +1008,17 @@ async function receiveSignal(keyword) {
     }
     
     // 新しいセッションを開始
-    await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
-    webRTCManager.setupDataChannel(isHost);
+    await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+    webRTCManager.setupDataChannel();
     
     const offer = await webRTCManager.createOffer();
     
     // 新しいトークンでオファーを送信
-    console.log('新しいオファーを送信中:', currentKeyword, 'トークン:', sessionToken);
-    await sendSignal(currentKeyword, {
+    console.log('新しいオファーを送信中:', sessionManager.currentKeyword, 'トークン:', sessionManager.sessionToken);
+    await sendSignal(sessionManager.currentKeyword, {
       type: 'offer',
       offer: offer,
-      token: sessionToken
+      token: sessionManager.sessionToken
     });
     console.log('新しいオファー送信完了');
     
@@ -991,8 +1033,6 @@ async function receiveSignal(keyword) {
       return;
     }
     
-    currentKeyword = keyword;
-    
     // 既存ストリームのクリーンアップ
     if (mediaManager.getLocalStream()) {
       mediaManager.stopCamera();
@@ -1000,7 +1040,7 @@ async function receiveSignal(keyword) {
     
     if (!await mediaManager.startCamera()) return;
     
-    isHost = false;
+    sessionManager.startSession(false, keyword);
     updateStatus('接続中...');
     toggleButtons(false);
     
@@ -1015,9 +1055,9 @@ async function receiveSignal(keyword) {
     
     const pollInterval = setInterval(async () => {
       attempts++;
-      if (attempts > maxAttempts || connectionEstablished) {
+      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
         clearInterval(pollInterval);
-        if (!connectionEstablished) {
+        if (!sessionManager.connectionEstablished) {
           updateStatus('タイムアウト: 参加者が見つかりませんでした');
         }
         return;
@@ -1025,8 +1065,8 @@ async function receiveSignal(keyword) {
       
       try {
         // トークンベースのパスと旧形式の両方をチェック
-        const answerPath = sessionToken ? 
-        `${keyword}/${sessionToken}/answer` : 
+        const answerPath = sessionManager.sessionToken ? 
+        `${keyword}/${sessionManager.sessionToken}/answer` : 
         `${keyword}-answer`;
         
         const signal = await receiveSignal(answerPath);
@@ -1045,7 +1085,7 @@ async function receiveSignal(keyword) {
   }
   
   async function startJoinPolling() {
-    const keyword = currentKeyword;
+    const keyword = sessionManager.currentKeyword;
     let attempts = 0;
     const maxAttempts = 30;
     
@@ -1053,9 +1093,9 @@ async function receiveSignal(keyword) {
     
     const pollInterval = setInterval(async () => {
       attempts++;
-      if (attempts > maxAttempts || connectionEstablished) {
+      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
         clearInterval(pollInterval);
-        if (!connectionEstablished) {
+        if (!sessionManager.connectionEstablished) {
           updateStatus('タイムアウト: セッションが見つかりませんでした');
           cleanup();
         }
@@ -1073,20 +1113,20 @@ async function receiveSignal(keyword) {
           
           // ホストからのトークンを保存
           if (signal.token) {
-            sessionToken = signal.token;
-            console.log('セッショントークン受信:', sessionToken);
+            sessionManager.sessionToken = signal.token;
+            console.log('セッショントークン受信:', sessionManager.sessionToken);
           }
           
-          await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
-          webRTCManager.setupDataChannel(isHost);
+          await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+          webRTCManager.setupDataChannel();
           
           await webRTCManager.setRemoteDescription(signal.offer);
           updateStatus('応答を作成中...');
           const answer = await webRTCManager.createAnswer();
           
           // トークンを使用した安全なパスで応答
-          const answerPath = sessionToken ? 
-          `${keyword}/${sessionToken}/answer` : 
+          const answerPath = sessionManager.sessionToken ? 
+          `${keyword}/${sessionManager.sessionToken}/answer` : 
           `${keyword}-answer`;
           
           updateStatus('応答を送信中...');
@@ -1107,10 +1147,10 @@ async function receiveSignal(keyword) {
   }
   
   async function pollForIceCandidates() {
-    const keyword = elements.keyword.value;
-    const targetKey = sessionToken ? 
-    `${keyword}/${sessionToken}/ice-${isHost ? 'guest' : 'host'}` :
-    `${keyword}-ice-${isHost ? 'guest' : 'host'}`;
+    const keyword = sessionManager.currentKeyword || elements.keyword.value;
+    const targetKey = sessionManager.sessionToken ? 
+    `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'guest' : 'host'}` :
+    `${keyword}-ice-${sessionManager.isHost ? 'guest' : 'host'}`;
     console.log('ICE候補ポーリング開始:', targetKey);
     
     let attempts = 0;
@@ -1118,7 +1158,7 @@ async function receiveSignal(keyword) {
     
     const pollInterval = setInterval(async () => {
       attempts++;
-      if (attempts > maxAttempts || connectionEstablished) {
+      if (attempts > maxAttempts || sessionManager.connectionEstablished) {
         console.log('ICE候補ポーリング終了');
         clearInterval(pollInterval);
         return;
@@ -1126,7 +1166,7 @@ async function receiveSignal(keyword) {
       
       try {
         const signal = await receiveSignal(targetKey);
-        if (signal && signal.type === 'ice-batch' && signal.isHost !== isHost) {
+        if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
           console.log('ICE候補受信:', signal.candidates.length, '個');
           clearInterval(pollInterval);
           updateStatus('ICE候補を受信 - 接続を確立中...');
@@ -1150,18 +1190,18 @@ async function receiveSignal(keyword) {
   }
   
   function startKeywordTimer() {
-    sessionStartTime = Date.now();
+    // sessionStartTime now managed by sessionManager
     updateTimer();
     
     keywordTimer = setTimeout(() => {
-      if (!sessionActive) {
+      if (!sessionManager.sessionActive) {
         updateStatus('キーワードの有効期限が切れました');
         cleanup();
       }
     }, 10 * 60 * 1000);
     
     const timerInterval = setInterval(() => {
-      if (!sessionStartTime) {
+      if (!sessionManager.startTime) {
         clearInterval(timerInterval);
         return;
       }
@@ -1170,12 +1210,12 @@ async function receiveSignal(keyword) {
   }
   
   function updateTimer() {
-    if (!sessionStartTime) return;
+    if (!sessionManager.startTime) return;
     
-    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
-    const remaining = Math.max(0, 600 - elapsed);
+    const elapsed = sessionManager.getSessionDuration();
+    const remaining = sessionManager.getRemainingTime();
     
-    if (!sessionActive && remaining > 0) {
+    if (!sessionManager.connectionEstablished && remaining > 0) {
       const minutes = Math.floor(remaining / 60);
       const seconds = remaining % 60;
       const timerText = `有効期限: ${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -1200,7 +1240,7 @@ async function receiveSignal(keyword) {
   
   function handleDisconnect() {
     clearReconnectInterval();
-    if (isHost) {
+    if (sessionManager.isHost) {
       updateStatus('セッション終了');
     } else {
       updateStatus('ホストが退室しました');
@@ -1249,22 +1289,19 @@ async function receiveSignal(keyword) {
     elements.remoteAA.textContent = '';
     
     // ホスト側でない場合のみローカルAAをクリア
-    if (!isHost) {
+    if (!sessionManager.isHost) {
       elements.localAA.textContent = '';
-      isHost = false;
     }
     
-    sessionActive = false;
-    sessionStartTime = null;
     // iceCandidates now managed by webRTCManager
     reconnectAttempts = 0;
-    connectionEstablished = false;
     isWaitingForGuest = false;
     
     // ゲスト退室時はホスト状態を保持
-    if (!isHost) {
-      currentKeyword = null;
-      sessionToken = null;
+    if (!sessionManager.isHost) {
+      sessionManager.reset();
+    } else {
+      sessionManager.endSession();
     }
     
     clearKeywordTimer();
@@ -1279,7 +1316,7 @@ async function receiveSignal(keyword) {
   }
   
   async function getConnectionType() {
-    if (!peerConnection) return null;
+    if (!webRTCManager.getPeerConnection()) return null;
     
     try {
       const stats = await webRTCManager.getPeerConnection().getStats();
@@ -1310,7 +1347,7 @@ async function receiveSignal(keyword) {
   }
   
   async function updateConnectionInfo(shouldUpdateStatus = false) {
-    if (!peerConnection) return;
+    if (!webRTCManager.getPeerConnection()) return;
     
     const connectionState = webRTCManager.getPeerConnection()?.connectionState;
     const iceConnectionState = webRTCManager.getPeerConnection()?.iceConnectionState;
@@ -1566,11 +1603,11 @@ async function receiveSignal(keyword) {
     console.log('デバイス選択適用:', {
       video: elements.videoSelectDialog.options[elements.videoSelectDialog.selectedIndex]?.text,
       audio: elements.audioSelectDialog.options[elements.audioSelectDialog.selectedIndex]?.text,
-      sessionActive: sessionActive
+      sessionActive: sessionManager.sessionActive
     });
     
     // 通話中の場合はデバイスを切り替え
-    if (sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
+    if (sessionManager.sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
       try {
         await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
       } catch (error) {
