@@ -372,7 +372,7 @@ class WebRTCManager {
     this.iceGatheringTimeout = null;
   }
 
-  async createPeerConnection(elements, updateStatus, sendSignal) {
+  async createPeerConnection(elements, updateStatus) {
     this.peerConnection = new RTCPeerConnection({ 
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
@@ -432,7 +432,7 @@ class WebRTCManager {
             `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
             `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
             console.log('ICE候補送信:', iceKey);
-            await sendSignal(iceKey, {
+            await signalingManager.sendSignal(iceKey, {
               type: 'ice-batch',
               candidates: this.iceCandidates,
               isHost: sessionManager.isHost
@@ -449,7 +449,7 @@ class WebRTCManager {
           `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
           `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
           console.log('ICE候補送信:', iceKey);
-          await sendSignal(iceKey, {
+          await signalingManager.sendSignal(iceKey, {
             type: 'ice-batch',
             candidates: this.iceCandidates,
             isHost: sessionManager.isHost
@@ -584,18 +584,92 @@ class WebRTCManager {
   }
 }
 
+// SignalingManager class for ppng.io communication
+class SignalingManager {
+  constructor() {
+    this.abortController = null;
+  }
+
+  async sendSignal(keyword, data) {
+    console.log('送信中:', keyword, 'データタイプ:', data.type);
+    const json = JSON.stringify(data);
+    const encrypted = Utility.xorEncrypt(json, keyword);
+    
+    const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'text/plain'
+      },
+      body: encrypted
+    });
+    
+    if (!response.ok) {
+      console.error('送信エラー:', response.status, response.statusText);
+      throw new Error('シグナル送信エラー');
+    }
+    console.log('送信成功:', keyword);
+  }
+
+  async receiveSignal(keyword) {
+    console.log('受信試行:', keyword);
+    
+    // AbortControllerを作成（既存のものがあればキャンセル）
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    this.abortController = new AbortController();
+    
+    try {
+      const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
+        signal: this.abortController.signal
+      });
+      
+      if (!response.ok) {
+        if (response.status === 400) {
+          console.log('受信結果: データなし (400)');
+          return null;
+        }
+        console.error('受信エラー:', response.status, response.statusText);
+        throw new Error('シグナル受信エラー');
+      }
+      
+      console.log('受信成功:', keyword);
+      const encrypted = await response.text();
+      const decrypted = Utility.xorDecrypt(encrypted, keyword);
+      const data = JSON.parse(decrypted);
+      console.log('受信データ:', data.type);
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('受信キャンセル:', keyword);
+        return null;
+      }
+      console.error('受信エラー:', error);
+      throw error;
+    }
+  }
+
+  abortCurrentRequest() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+      console.log('ppng.io接続をキャンセルしました');
+    }
+  }
+}
+
 
 // Global instances
 const mediaManager = new MediaManager();
 const webRTCManager = new WebRTCManager();
 const sessionManager = new SessionManager();
+const signalingManager = new SignalingManager();
 let keywordTimer = null;
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let reconnectInterval = null;
 let activePollingIntervals = [];
 let isWaitingForGuest = false;
-let currentAbortController = null;
 
 const elements = {
   keyword: document.getElementById('keyword'),
@@ -854,62 +928,6 @@ function addPollingInterval(intervalId) {
   activePollingIntervals.push(intervalId);
 }
 
-async function sendSignal(keyword, data) {
-  console.log('送信中:', keyword, 'データタイプ:', data.type);
-  const json = JSON.stringify(data);
-  const encrypted = Utility.xorEncrypt(json, keyword);
-  
-  const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-    method: 'PUT',
-    headers: { 
-      'Content-Type': 'text/plain'
-    },
-    body: encrypted
-  });
-  
-  if (!response.ok) {
-    console.error('送信エラー:', response.status, response.statusText);
-    throw new Error('シグナル送信エラー');
-  }
-  console.log('送信成功:', keyword);
-}
-
-async function receiveSignal(keyword) {
-  console.log('受信試行:', keyword);
-  
-  // AbortControllerを作成（既存のものがあればキャンセル）
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
-  currentAbortController = new AbortController();
-  
-  try {
-    const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-      signal: currentAbortController.signal
-    });
-    
-    if (!response.ok) {
-      if (response.status === 400) {
-        console.log('受信結果: データなし (400)');
-        return null;
-      }
-      console.error('受信エラー:', response.status, response.statusText);
-      throw new Error('シグナル受信エラー');
-    }
-    
-    const encrypted = await response.text();
-    const decrypted = Utility.xorDecrypt(encrypted, keyword);
-    const data = JSON.parse(decrypted);
-    console.log('受信成功:', keyword, 'データタイプ:', data.type);
-    return data;
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('受信キャンセル:', keyword);
-      return null;
-    }
-    throw error;
-  }
-}
 
   
   async function hostSession() {
@@ -927,7 +945,7 @@ async function receiveSignal(keyword) {
     
     // セッショントークンは startSession で生成済み
     
-    await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+    await webRTCManager.createPeerConnection(elements, updateStatus);
     webRTCManager.setupDataChannel();
     
     // オファー作成時のオプションを追加
@@ -935,7 +953,7 @@ async function receiveSignal(keyword) {
     
     console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
     try {
-      await sendSignal(keyword, {
+      await signalingManager.sendSignal(keyword, {
         type: 'offer',
         offer: offer,
         token: sessionManager.sessionToken
@@ -1008,14 +1026,14 @@ async function receiveSignal(keyword) {
     }
     
     // 新しいセッションを開始
-    await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+    await webRTCManager.createPeerConnection(elements, updateStatus);
     webRTCManager.setupDataChannel();
     
     const offer = await webRTCManager.createOffer();
     
     // 新しいトークンでオファーを送信
     console.log('新しいオファーを送信中:', sessionManager.currentKeyword, 'トークン:', sessionManager.sessionToken);
-    await sendSignal(sessionManager.currentKeyword, {
+    await signalingManager.sendSignal(sessionManager.currentKeyword, {
       type: 'offer',
       offer: offer,
       token: sessionManager.sessionToken
@@ -1069,7 +1087,7 @@ async function receiveSignal(keyword) {
         `${keyword}/${sessionManager.sessionToken}/answer` : 
         `${keyword}-answer`;
         
-        const signal = await receiveSignal(answerPath);
+        const signal = await signalingManager.receiveSignal(answerPath);
         if (signal && signal.type === 'answer') {
           clearInterval(pollInterval);
           updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
@@ -1105,7 +1123,7 @@ async function receiveSignal(keyword) {
       try {
         // シンプルに基本キーワードのみを検索
         console.log('オファーを検索中:', keyword);
-        const signal = await receiveSignal(keyword);
+        const signal = await signalingManager.receiveSignal(keyword);
         
         if (signal && signal.type === 'offer') {
           clearInterval(pollInterval);
@@ -1117,7 +1135,7 @@ async function receiveSignal(keyword) {
             console.log('セッショントークン受信:', sessionManager.sessionToken);
           }
           
-          await webRTCManager.createPeerConnection(elements, updateStatus, sendSignal);
+          await webRTCManager.createPeerConnection(elements, updateStatus);
           webRTCManager.setupDataChannel();
           
           await webRTCManager.setRemoteDescription(signal.offer);
@@ -1130,7 +1148,7 @@ async function receiveSignal(keyword) {
           `${keyword}-answer`;
           
           updateStatus('応答を送信中...');
-          await sendSignal(answerPath, {
+          await signalingManager.sendSignal(answerPath, {
             type: 'answer',
             answer: answer
           });
@@ -1165,7 +1183,7 @@ async function receiveSignal(keyword) {
       }
       
       try {
-        const signal = await receiveSignal(targetKey);
+        const signal = await signalingManager.receiveSignal(targetKey);
         if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
           console.log('ICE候補受信:', signal.candidates.length, '個');
           clearInterval(pollInterval);
@@ -1270,11 +1288,7 @@ async function receiveSignal(keyword) {
     stopAllPolling(); // 全ポーリング停止
     
     // 進行中のppng.io接続をキャンセル
-    if (currentAbortController) {
-      currentAbortController.abort();
-      currentAbortController = null;
-      console.log('ppng.io接続をキャンセルしました');
-    }
+    signalingManager.abortCurrentRequest();
     
     webRTCManager.close();
     
