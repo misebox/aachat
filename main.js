@@ -408,12 +408,27 @@ class WebRTCManager {
     
     this.peerConnection.ontrack = (event) => {
       console.log('リモートトラック受信:', event.track.kind);
-      this.elements.remoteVideo.srcObject = event.streams[0];
-      this.elements.remoteVideo.onloadedmetadata = () => {
-        console.log('リモートビデオサイズ:', this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
-      };
-      // リモートビデオの適切な再生処理
-      playVideoSafely(this.elements.remoteVideo, 'リモート');
+      console.log('Remote video element:', this.elements.remoteVideo);
+      console.log('Event streams:', event.streams);
+      
+      if (this.elements.remoteVideo && event.streams[0]) {
+        this.elements.remoteVideo.srcObject = event.streams[0];
+        this.elements.remoteVideo.onloadedmetadata = () => {
+          console.log('リモートビデオサイズ:', this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
+          console.log('Remote video ready for AA conversion');
+        };
+        
+        // より確実なビデオ準備待ち
+        this.elements.remoteVideo.oncanplay = () => {
+          console.log('Remote video can play - forcing play');
+          this.elements.remoteVideo.play().catch(e => console.log('Remote video play failed:', e));
+        };
+        
+        // リモートビデオの適切な再生処理
+        playVideoSafely(this.elements.remoteVideo, 'リモート');
+      } else {
+        console.error('Missing remote video element or stream');
+      }
     };
     
     this.peerConnection.onicecandidate = async (event) => {
@@ -463,9 +478,8 @@ class WebRTCManager {
   }
 
   setupConnectionEventHandlers() {
-    this.peerConnection.onconnectionstatechange = () => {
+    this.peerConnection.onconnectionstatechange = async () => {
       console.log('接続状態:', this.peerConnection.connectionState);
-      uiManager.updateStatus(`接続状態: ${this.peerConnection.connectionState}`);
       
       if (this.peerConnection.connectionState === 'connected') {
         sessionManager.sessionActive = true;
@@ -475,8 +489,25 @@ class WebRTCManager {
         clearKeywordTimer();
         stopAllPolling(); // 接続完了時にポーリング停止
         
-        // 接続方法を取得してステータスに表示
-        setTimeout(() => updateConnectionInfo(true), 1000);
+        // connectionTypeを取得して表示（何度か試行）
+        console.log('onconnectionstatechange: 接続完了を検出');
+        await updateConnectionInfo(true);
+        
+        // connectionTypeが取得できない場合に備えて数回リトライ
+        let retryCount = 0;
+        const retryTimer = setInterval(async () => {
+          retryCount++;
+          const connectionType = await getConnectionType();
+          if (connectionType) {
+            console.log('接続完了ステータス更新:', connectionType);
+            uiManager.updateStatus(`接続完了 (${connectionType})`);
+            clearInterval(retryTimer);
+          } else if (retryCount >= 5) {
+            // 5回リトライしても取得できない場合は接続完了のみ表示
+            uiManager.updateStatus('接続完了');
+            clearInterval(retryTimer);
+          }
+        }, 2000);
       } else if (this.peerConnection.connectionState === 'disconnected' || 
         this.peerConnection.connectionState === 'failed') {
           if (sessionManager.connectionEstablished) {
@@ -502,9 +533,15 @@ class WebRTCManager {
       };
       
       // ICE接続状態の監視
-      this.peerConnection.oniceconnectionstatechange = () => {
+      this.peerConnection.oniceconnectionstatechange = async () => {
         console.log('ICE接続状態:', this.peerConnection.iceConnectionState);
-        updateConnectionInfo();
+        
+        // ICE接続が完了した場合はステータスを更新
+        if (this.peerConnection.iceConnectionState === 'connected') {
+          await updateConnectionInfo(true);
+        } else {
+          updateConnectionInfo();
+        }
       };
       
       // ICE収集状態の監視
@@ -777,6 +814,9 @@ class ASCIIConverter {
   }
 
   startConversion(localVideo, remoteVideo, localAA, remoteAA) {
+    // 既に動作中の場合は停止してから再開
+    this.stopConversion();
+    
     // コントラスト調整タイマー（1秒ごと）
     this.contrastTimer = setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
@@ -796,6 +836,16 @@ class ASCIIConverter {
       if (remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
         const remoteAAText = this.videoToAscii(remoteVideo);
         remoteAA.textContent = remoteAAText;
+      } else if (remoteVideo.srcObject) {
+        // リモートビデオがあるがサイズが0の場合のログ
+        if (remoteVideo.videoWidth === 0) {
+          console.log('Remote video has stream but no dimensions:', {
+            readyState: remoteVideo.readyState,
+            paused: remoteVideo.paused,
+            videoWidth: remoteVideo.videoWidth,
+            videoHeight: remoteVideo.videoHeight
+          });
+        }
       }
     }, 16); // 約60fps
   }
@@ -827,6 +877,10 @@ class UIManager {
   toggleButtons(enabled) {
     this.elements.hostBtn.disabled = !enabled;
     this.elements.joinBtn.disabled = !enabled;
+    
+    // モバイルでもボタンを完全に非表示にする
+    this.elements.hostBtn.style.display = enabled ? 'inline-block' : 'none';
+    this.elements.joinBtn.style.display = enabled ? 'inline-block' : 'none';
     this.elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
     this.elements.clearBtn.style.display = enabled ? 'none' : 'inline-block';
     
@@ -1119,11 +1173,87 @@ class UIManager {
 }
 
 
-// Global instances
-const mediaManager = new MediaManager();
-const webRTCManager = new WebRTCManager();
-const sessionManager = new SessionManager();
-const signalingManager = new SignalingManager();
+// AAChat Main Class - coordinates all managers
+class AAChat {
+  constructor() {
+    // Initialize DOM elements
+    this.elements = {
+      keyword: document.getElementById('keyword'),
+      clearBtn: document.getElementById('clearBtn'),
+      hostBtn: document.getElementById('hostBtn'),
+      joinBtn: document.getElementById('joinBtn'),
+      leaveBtn: document.getElementById('leaveBtn'),
+      statusText: document.getElementById('statusText'),
+      timer: document.getElementById('timer'),
+      statusText2: document.getElementById('statusText2'),
+      timer2: document.getElementById('timer2'),
+      localVideo: document.getElementById('localVideo'),
+      remoteVideo: document.getElementById('remoteVideo'),
+      localAA: document.getElementById('localAA'),
+      remoteAA: document.getElementById('remoteAA'),
+      canvas: document.getElementById('canvas'),
+      videoSelect: document.getElementById('videoSelect'),
+      audioSelect: document.getElementById('audioSelect'),
+      refreshDevices: document.getElementById('refreshDevices'),
+      deviceBtn: document.getElementById('deviceBtn'),
+      mobileDeviceBtn: document.getElementById('mobileDeviceBtn'),
+      deviceDialog: document.getElementById('deviceDialog'),
+      closeDialog: document.getElementById('closeDialog'),
+      videoSelectDialog: document.getElementById('videoSelectDialog'),
+      audioSelectDialog: document.getElementById('audioSelectDialog'),
+      refreshDevicesDialog: document.getElementById('refreshDevicesDialog'),
+      applyDevices: document.getElementById('applyDevices'),
+      helpBtn: document.getElementById('helpBtn'),
+      helpDialog: document.getElementById('helpDialog'),
+      closeHelpDialog: document.getElementById('closeHelpDialog'),
+      mobileHelpBtn: document.getElementById('mobileHelpBtn')
+    };
+
+    // Initialize managers
+    this.mediaManager = new MediaManager();
+    this.webRTCManager = new WebRTCManager();
+    this.sessionManager = new SessionManager();
+    this.signalingManager = new SignalingManager();
+    
+    // Initialize canvas and converters
+    this.ctx = this.elements.canvas.getContext('2d');
+    this.asciiConverter = new ASCIIConverter(this.elements.canvas, this.ctx);
+    this.uiManager = new UIManager(this.elements);
+
+    // State variables
+    this.keywordTimer = null;
+    this.timerInterval = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectInterval = null;
+    this.activePollingIntervals = [];
+    this.isWaitingForGuest = false;
+  }
+
+  // Getter methods for backward compatibility
+  getMediaManager() { return this.mediaManager; }
+  getWebRTCManager() { return this.webRTCManager; }
+  getSessionManager() { return this.sessionManager; }
+  getSignalingManager() { return this.signalingManager; }
+  getASCIIConverter() { return this.asciiConverter; }
+  getUIManager() { return this.uiManager; }
+  getElements() { return this.elements; }
+}
+
+// Global instance
+const aaChat = new AAChat();
+
+// Backward compatibility - expose individual managers as globals
+const mediaManager = aaChat.getMediaManager();
+const webRTCManager = aaChat.getWebRTCManager();
+const sessionManager = aaChat.getSessionManager();
+const signalingManager = aaChat.getSignalingManager();
+const asciiConverter = aaChat.getASCIIConverter();
+const uiManager = aaChat.getUIManager();
+const elements = aaChat.getElements();
+const ctx = aaChat.ctx;
+
+// Backward compatibility - expose state variables as globals
 let keywordTimer = null;
 let timerInterval = null;
 let reconnectAttempts = 0;
@@ -1131,42 +1261,6 @@ let maxReconnectAttempts = 5;
 let reconnectInterval = null;
 let activePollingIntervals = [];
 let isWaitingForGuest = false;
-
-const elements = {
-  keyword: document.getElementById('keyword'),
-  clearBtn: document.getElementById('clearBtn'),
-  hostBtn: document.getElementById('hostBtn'),
-  joinBtn: document.getElementById('joinBtn'),
-  leaveBtn: document.getElementById('leaveBtn'),
-  statusText: document.getElementById('statusText'),
-  timer: document.getElementById('timer'),
-  statusText2: document.getElementById('statusText2'),
-  timer2: document.getElementById('timer2'),
-  localVideo: document.getElementById('localVideo'),
-  remoteVideo: document.getElementById('remoteVideo'),
-  localAA: document.getElementById('localAA'),
-  remoteAA: document.getElementById('remoteAA'),
-  canvas: document.getElementById('canvas'),
-  videoSelect: document.getElementById('videoSelect'),
-  audioSelect: document.getElementById('audioSelect'),
-  refreshDevices: document.getElementById('refreshDevices'),
-  deviceBtn: document.getElementById('deviceBtn'),
-  mobileDeviceBtn: document.getElementById('mobileDeviceBtn'),
-  deviceDialog: document.getElementById('deviceDialog'),
-  closeDialog: document.getElementById('closeDialog'),
-  videoSelectDialog: document.getElementById('videoSelectDialog'),
-  audioSelectDialog: document.getElementById('audioSelectDialog'),
-  refreshDevicesDialog: document.getElementById('refreshDevicesDialog'),
-  applyDevices: document.getElementById('applyDevices'),
-  helpBtn: document.getElementById('helpBtn'),
-  helpDialog: document.getElementById('helpDialog'),
-  closeHelpDialog: document.getElementById('closeHelpDialog'),
-  mobileHelpBtn: document.getElementById('mobileHelpBtn')
-};
-
-const ctx = elements.canvas.getContext('2d');
-const asciiConverter = new ASCIIConverter(elements.canvas, ctx);
-const uiManager = new UIManager(elements);
 
 
 // デバイス選択肢を更新
@@ -1270,6 +1364,9 @@ function addPollingInterval(intervalId) {
     sessionManager.startSession(true, keyword);
     uiManager.updateStatus('接続準備中...');
     uiManager.toggleButtons(false);
+    
+    // ASCII変換を開始（ホスト開始時に必要）
+    asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
     
     // セッショントークンは startSession で生成済み
     
@@ -1389,6 +1486,9 @@ function addPollingInterval(intervalId) {
     sessionManager.startSession(false, keyword);
     uiManager.updateStatus('接続中...');
     uiManager.toggleButtons(false);
+    
+    // ASCII変換を再開（再参加時に必要）
+    asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
     
     // シンプルにポーリングで検索
     startJoinPolling();
@@ -1517,7 +1617,7 @@ function addPollingInterval(intervalId) {
           clearInterval(pollInterval);
           uiManager.updateStatus('ICE候補を受信 - 接続を確立中...');
           for (const candidate of signal.candidates) {
-            console.log('ICE候補追加:', candidate.type);
+            console.log('ICE候補追加:', candidate.candidate ? candidate.candidate.split(' ')[7] : 'unknown');
             try {
               await webRTCManager.addIceCandidate(candidate);
             } catch (error) {
@@ -1525,7 +1625,18 @@ function addPollingInterval(intervalId) {
             }
           }
           console.log('ICE候補追加完了');
-          uiManager.updateStatus('接続を確立中...');
+          
+          // ICE候補追加後、接続状態をチェック
+          setTimeout(async () => {
+            const currentState = webRTCManager.getPeerConnection()?.connectionState;
+            console.log('ICE候補追加後の接続状態:', currentState);
+            
+            if (currentState === 'connected') {
+              await updateConnectionInfo(true);
+            } else {
+              uiManager.updateStatus('接続を確立中...');
+            }
+          }, 1000);
         }
       } catch (error) {
         console.log('ICE候補受信エラー:', error.message);
@@ -1717,7 +1828,7 @@ function addPollingInterval(intervalId) {
       }
     } else {
       // 詳細な接続情報を表示
-      const info = `接続: ${connectionState} | ICE: ${iceConnectionState} | 収集: ${iceGatheringState}`;
+      const info = `${connectionState} | ice: ${iceConnectionState} | gathering: ${iceGatheringState}`;
       elements.timer.textContent = info;
       elements.timer2.textContent = info;
     }
