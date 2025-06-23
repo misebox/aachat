@@ -248,7 +248,7 @@ class MediaManager {
     const newStream = await navigator.mediaDevices.getUserMedia(constraints);
     
     // トラックを置換
-    const senders = peerConnection.getSenders();
+    const senders = webRTCManager.getPeerConnection().getSenders();
     
     if (videoChanged) {
       const newVideoTrack = newStream.getVideoTracks()[0];
@@ -310,16 +310,235 @@ class MediaManager {
   }
 }
 
+// WebRTCManager class for peer connection management
+class WebRTCManager {
+  constructor() {
+    this.peerConnection = null;
+    this.dataChannel = null;
+    this.iceCandidates = [];
+    this.iceGatheringTimeout = null;
+  }
+
+  async createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal) {
+    this.peerConnection = new RTCPeerConnection({ 
+      iceServers: Config.STUN_SERVERS,
+      iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
+      bundlePolicy: 'max-bundle', // メディアバンドル最大化
+      rtcpMuxPolicy: 'require' // RTCP多重化
+    });
+    
+    console.log('ローカルストリーム追加開始');
+    mediaManager.getLocalStream().getTracks().forEach(track => {
+      console.log('トラック追加:', track.kind, track.enabled, 'readyState:', track.readyState);
+      if (track.readyState === 'live') {
+        this.peerConnection.addTrack(track, mediaManager.getLocalStream());
+      } else {
+        console.warn('トラックが無効:', track.kind, track.readyState);
+      }
+    });
+    console.log('ローカルストリーム追加完了');
+    
+    // 高FPS設定をトラック追加後に設定
+    setTimeout(async () => {
+      const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) {
+        const params = sender.getParameters();
+        if (params.encodings && params.encodings.length > 0) {
+          params.encodings[0].maxBitrate = 50000; // 50kbps（高FPS用に増加）
+          params.encodings[0].maxFramerate = 60; // 60FPS設定
+          await sender.setParameters(params);
+          console.log('高FPS設定: 60fps, 50kbps');
+        }
+      }
+    }, 1000);
+    
+    this.peerConnection.ontrack = (event) => {
+      console.log('リモートトラック受信:', event.track.kind);
+      elements.remoteVideo.srcObject = event.streams[0];
+      elements.remoteVideo.onloadedmetadata = () => {
+        console.log('リモートビデオサイズ:', elements.remoteVideo.videoWidth, 'x', elements.remoteVideo.videoHeight);
+      };
+      // リモートビデオの適切な再生処理
+      playVideoSafely(elements.remoteVideo, 'リモート');
+    };
+    
+    this.peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        console.log('ICE候補収集:', event.candidate.type, event.candidate.address);
+        this.iceCandidates.push(event.candidate);
+        
+        // タイムアウトをリセット
+        if (this.iceGatheringTimeout) clearTimeout(this.iceGatheringTimeout);
+        
+        // 3秒待ってから送信（より多くの候補を収集）
+        this.iceGatheringTimeout = setTimeout(async () => {
+          console.log('ICE候補収集タイムアウト. 候補数:', this.iceCandidates.length);
+          if (this.iceCandidates.length > 0) {
+            const keyword = elements.keyword.value;
+            const iceKey = sessionToken ? 
+            `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
+            `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+            console.log('ICE候補送信:', iceKey);
+            await sendSignal(iceKey, {
+              type: 'ice-batch',
+              candidates: this.iceCandidates,
+              isHost: isHost
+            });
+          }
+        }, 3000);
+      } else {
+        // ICE候補収集完了
+        if (this.iceGatheringTimeout) clearTimeout(this.iceGatheringTimeout);
+        console.log('ICE候補収集完了. 候補数:', this.iceCandidates.length);
+        if (this.iceCandidates.length > 0) {
+          const keyword = elements.keyword.value;
+          const iceKey = sessionToken ? 
+          `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
+          `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
+          console.log('ICE候補送信:', iceKey);
+          await sendSignal(iceKey, {
+            type: 'ice-batch',
+            candidates: this.iceCandidates,
+            isHost: isHost
+          });
+        }
+      }
+    };
+    
+    this.setupConnectionEventHandlers(isHost, updateStatus);
+  }
+
+  setupConnectionEventHandlers(isHost, updateStatus) {
+    this.peerConnection.onconnectionstatechange = () => {
+      console.log('接続状態:', this.peerConnection.connectionState);
+      updateStatus(`接続状態: ${this.peerConnection.connectionState}`);
+      
+      if (this.peerConnection.connectionState === 'connected') {
+        sessionActive = true;
+        connectionEstablished = true;
+        isWaitingForGuest = false;
+        reconnectAttempts = 0;
+        clearKeywordTimer();
+        stopAllPolling(); // 接続完了時にポーリング停止
+        
+        // 接続方法を取得してステータスに表示
+        setTimeout(() => updateConnectionInfo(true), 1000);
+      } else if (this.peerConnection.connectionState === 'disconnected' || 
+        this.peerConnection.connectionState === 'failed') {
+          if (connectionEstablished) {
+            // 一度接続した後の切断の場合
+            connectionEstablished = false;
+            sessionActive = false;
+            
+            if (isHost) {
+              // ホストは最初からやり直し
+              updateStatus('参加者が退室しました。新しいセッションを開始中...');
+              setTimeout(() => {
+                restartHostSession();
+              }, 1000);
+            } else {
+              // ゲストは接続失敗として処理
+              updateStatus('接続が切断されました');
+              cleanup();
+            }
+          } else {
+            handleDisconnect();
+          }
+        }
+      };
+      
+      // ICE接続状態の監視
+      this.peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE接続状態:', this.peerConnection.iceConnectionState);
+        updateConnectionInfo();
+      };
+      
+      // ICE収集状態の監視
+      this.peerConnection.onicegatheringstatechange = () => {
+        console.log('ICE収集状態:', this.peerConnection.iceGatheringState);
+        updateConnectionInfo();
+      };
+  }
+
+  setupDataChannel(isHost) {
+    if (isHost) {
+      this.dataChannel = this.peerConnection.createDataChannel('aa-data');
+      this.setupDataChannelEvents();
+    } else {
+      this.peerConnection.ondatachannel = (event) => {
+        this.dataChannel = event.channel;
+        this.setupDataChannelEvents();
+      };
+    }
+  }
+
+  setupDataChannelEvents() {
+    this.dataChannel.onopen = () => {
+      console.log('データチャンネル開通');
+    };
+    
+    this.dataChannel.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+    };
+    
+    this.dataChannel.onerror = (error) => {
+      console.error('データチャンネルエラー:', error);
+    };
+  }
+
+  async createOffer() {
+    const offer = await this.peerConnection.createOffer();
+    await this.peerConnection.setLocalDescription(offer);
+    return offer;
+  }
+
+  async createAnswer() {
+    const answer = await this.peerConnection.createAnswer();
+    await this.peerConnection.setLocalDescription(answer);
+    return answer;
+  }
+
+  async setRemoteDescription(description) {
+    await this.peerConnection.setRemoteDescription(description);
+  }
+
+  async addIceCandidate(candidate) {
+    await this.peerConnection.addIceCandidate(candidate);
+  }
+
+  getPeerConnection() {
+    return this.peerConnection;
+  }
+
+  getDataChannel() {
+    return this.dataChannel;
+  }
+
+  close() {
+    if (this.iceGatheringTimeout) {
+      clearTimeout(this.iceGatheringTimeout);
+      this.iceGatheringTimeout = null;
+    }
+    if (this.dataChannel) {
+      this.dataChannel.close();
+      this.dataChannel = null;
+    }
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    this.iceCandidates = [];
+  }
+}
+
 
 // Global instances
 const mediaManager = new MediaManager();
-let peerConnection = null;
-let dataChannel = null;
+const webRTCManager = new WebRTCManager();
 let isHost = false;
 let sessionActive = false;
 let keywordTimer = null;
 let sessionStartTime = null;
-let iceCandidates = [];
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let reconnectInterval = null;
@@ -644,170 +863,6 @@ async function receiveSignal(keyword) {
   }
 }
 
-async function createPeerConnection() {
-  peerConnection = new RTCPeerConnection({ 
-    iceServers: Config.STUN_SERVERS,
-    iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
-    bundlePolicy: 'max-bundle', // メディアバンドル最大化
-    rtcpMuxPolicy: 'require' // RTCP多重化
-  });
-  
-  
-  console.log('ローカルストリーム追加開始');
-  mediaManager.getLocalStream().getTracks().forEach(track => {
-    console.log('トラック追加:', track.kind, track.enabled, 'readyState:', track.readyState);
-    if (track.readyState === 'live') {
-      peerConnection.addTrack(track, mediaManager.getLocalStream());
-    } else {
-      console.warn('トラックが無効:', track.kind, track.readyState);
-    }
-  });
-  console.log('ローカルストリーム追加完了');
-  
-  // 高FPS設定をトラック追加後に設定
-  setTimeout(async () => {
-    const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-    if (sender) {
-      const params = sender.getParameters();
-      if (params.encodings && params.encodings.length > 0) {
-        params.encodings[0].maxBitrate = 50000; // 50kbps（高FPS用に増加）
-        params.encodings[0].maxFramerate = 60; // 60FPS設定
-        await sender.setParameters(params);
-        console.log('高FPS設定: 60fps, 50kbps');
-      }
-    }
-  }, 1000);
-  
-  peerConnection.ontrack = (event) => {
-    console.log('リモートトラック受信:', event.track.kind);
-    elements.remoteVideo.srcObject = event.streams[0];
-    elements.remoteVideo.onloadedmetadata = () => {
-      console.log('リモートビデオサイズ:', elements.remoteVideo.videoWidth, 'x', elements.remoteVideo.videoHeight);
-    };
-    // リモートビデオの適切な再生処理
-    playVideoSafely(elements.remoteVideo, 'リモート');
-  };
-  
-  let iceGatheringTimeout = null;
-  peerConnection.onicecandidate = async (event) => {
-    if (event.candidate) {
-      console.log('ICE候補収集:', event.candidate.type, event.candidate.address);
-      iceCandidates.push(event.candidate);
-      
-      // タイムアウトをリセット
-      if (iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
-      
-      // 3秒待ってから送信（より多くの候補を収集）
-      iceGatheringTimeout = setTimeout(async () => {
-        console.log('ICE候補収集タイムアウト. 候補数:', iceCandidates.length);
-        if (iceCandidates.length > 0) {
-          const keyword = elements.keyword.value;
-          const iceKey = sessionToken ? 
-          `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
-          `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
-          console.log('ICE候補送信:', iceKey);
-          await sendSignal(iceKey, {
-            type: 'ice-batch',
-            candidates: iceCandidates,
-            isHost: isHost
-          });
-        }
-      }, 3000);
-    } else {
-      // ICE候補収集完了
-      if (iceGatheringTimeout) clearTimeout(iceGatheringTimeout);
-      console.log('ICE候補収集完了. 候補数:', iceCandidates.length);
-      if (iceCandidates.length > 0) {
-        const keyword = elements.keyword.value;
-        const iceKey = sessionToken ? 
-        `${keyword}/${sessionToken}/ice-${isHost ? 'host' : 'guest'}` :
-        `${keyword}-ice-${isHost ? 'host' : 'guest'}`;
-        console.log('ICE候補送信:', iceKey);
-        await sendSignal(iceKey, {
-          type: 'ice-batch',
-          candidates: iceCandidates,
-          isHost: isHost
-        });
-      }
-    }
-  };
-  
-  peerConnection.onconnectionstatechange = () => {
-    console.log('接続状態:', peerConnection.connectionState);
-    updateStatus(`接続状態: ${peerConnection.connectionState}`);
-    
-    if (peerConnection.connectionState === 'connected') {
-      sessionActive = true;
-      connectionEstablished = true;
-      isWaitingForGuest = false;
-      reconnectAttempts = 0;
-      clearKeywordTimer();
-      stopAllPolling(); // 接続完了時にポーリング停止
-      
-      // 接続方法を取得してステータスに表示
-      setTimeout(() => updateConnectionInfo(true), 1000);
-    } else if (peerConnection.connectionState === 'disconnected' || 
-      peerConnection.connectionState === 'failed') {
-        if (connectionEstablished) {
-          // 一度接続した後の切断の場合
-          connectionEstablished = false;
-          sessionActive = false;
-          
-          if (isHost) {
-            // ホストは最初からやり直し
-            updateStatus('参加者が退室しました。新しいセッションを開始中...');
-            setTimeout(() => {
-              restartHostSession();
-            }, 1000);
-          } else {
-            // ゲストは接続失敗として処理
-            updateStatus('接続が切断されました');
-            cleanup();
-          }
-        } else {
-          handleDisconnect();
-        }
-      }
-    };
-    
-    // ICE接続状態の監視
-    peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE接続状態:', peerConnection.iceConnectionState);
-      updateConnectionInfo();
-    };
-    
-    // ICE収集状態の監視
-    peerConnection.onicegatheringstatechange = () => {
-      console.log('ICE収集状態:', peerConnection.iceGatheringState);
-      updateConnectionInfo();
-    };
-  }
-  
-  function setupDataChannel() {
-    if (isHost) {
-      dataChannel = peerConnection.createDataChannel('aa-data');
-      setupDataChannelEvents();
-    } else {
-      peerConnection.ondatachannel = (event) => {
-        dataChannel = event.channel;
-        setupDataChannelEvents();
-      };
-    }
-  }
-  
-  function setupDataChannelEvents() {
-    dataChannel.onopen = () => {
-      console.log('データチャンネル開通');
-    };
-    
-    dataChannel.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-    };
-    
-    dataChannel.onerror = (error) => {
-      console.error('データチャンネルエラー:', error);
-    };
-  }
   
   async function hostSession() {
     const keyword = elements.keyword.value.trim();
@@ -824,19 +879,14 @@ async function createPeerConnection() {
     updateStatus('接続準備中...');
     toggleButtons(false);
     
-    await createPeerConnection();
-    setupDataChannel();
-    
-    // オファー作成時のオプションを追加
-    const offer = await peerConnection.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true,
-      iceRestart: false
-    });
-    await peerConnection.setLocalDescription(offer);
-    
     // セッショントークンを生成
     sessionToken = Utility.generateSessionToken();
+    
+    await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
+    webRTCManager.setupDataChannel(isHost);
+    
+    // オファー作成時のオプションを追加
+    const offer = await webRTCManager.createOffer();
     
     console.log('オファーを送信中:', keyword, 'トークン:', sessionToken);
     try {
@@ -898,10 +948,10 @@ async function createPeerConnection() {
     // 既存の接続をクリーンアップ
     stopAllPolling();
     if (peerConnection) {
-      peerConnection.close();
+      webRTCManager.close();
       peerConnection = null;
     }
-    iceCandidates = [];
+    // iceCandidates now managed by webRTCManager
     connectionEstablished = false;
     isWaitingForGuest = false;
     sessionToken = Utility.generateSessionToken();
@@ -916,15 +966,10 @@ async function createPeerConnection() {
     }
     
     // 新しいセッションを開始
-    await createPeerConnection();
-    setupDataChannel();
+    await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
+    webRTCManager.setupDataChannel(isHost);
     
-    const offer = await peerConnection.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true,
-      iceRestart: false
-    });
-    await peerConnection.setLocalDescription(offer);
+    const offer = await webRTCManager.createOffer();
     
     // 新しいトークンでオファーを送信
     console.log('新しいオファーを送信中:', currentKeyword, 'トークン:', sessionToken);
@@ -988,7 +1033,7 @@ async function createPeerConnection() {
         if (signal && signal.type === 'answer') {
           clearInterval(pollInterval);
           updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
-          await peerConnection.setRemoteDescription(signal.answer);
+          await webRTCManager.setRemoteDescription(signal.answer);
           pollForIceCandidates();
         }
       } catch (error) {
@@ -1032,13 +1077,12 @@ async function createPeerConnection() {
             console.log('セッショントークン受信:', sessionToken);
           }
           
-          await createPeerConnection();
-          setupDataChannel();
+          await webRTCManager.createPeerConnection(isHost, sessionToken, elements, updateStatus, sendSignal);
+          webRTCManager.setupDataChannel(isHost);
           
-          await peerConnection.setRemoteDescription(signal.offer);
+          await webRTCManager.setRemoteDescription(signal.offer);
           updateStatus('応答を作成中...');
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
+          const answer = await webRTCManager.createAnswer();
           
           // トークンを使用した安全なパスで応答
           const answerPath = sessionToken ? 
@@ -1089,7 +1133,7 @@ async function createPeerConnection() {
           for (const candidate of signal.candidates) {
             console.log('ICE候補追加:', candidate.type);
             try {
-              await peerConnection.addIceCandidate(candidate);
+              await webRTCManager.addIceCandidate(candidate);
             } catch (error) {
               console.log('ICE候補追加エラー:', error.message);
             }
@@ -1192,15 +1236,7 @@ async function createPeerConnection() {
       console.log('ppng.io接続をキャンセルしました');
     }
     
-    if (dataChannel) {
-      dataChannel.close();
-      dataChannel = null;
-    }
-    
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
-    }
+    webRTCManager.close();
     
     // ローカルストリームをクリーンアップ（ホスト・ゲスト両方）
     if (mediaManager.getLocalStream()) {
@@ -1220,7 +1256,7 @@ async function createPeerConnection() {
     
     sessionActive = false;
     sessionStartTime = null;
-    iceCandidates = [];
+    // iceCandidates now managed by webRTCManager
     reconnectAttempts = 0;
     connectionEstablished = false;
     isWaitingForGuest = false;
@@ -1246,7 +1282,7 @@ async function createPeerConnection() {
     if (!peerConnection) return null;
     
     try {
-      const stats = await peerConnection.getStats();
+      const stats = await webRTCManager.getPeerConnection().getStats();
       let connectionType = '';
       
       stats.forEach(report => {
@@ -1276,9 +1312,9 @@ async function createPeerConnection() {
   async function updateConnectionInfo(shouldUpdateStatus = false) {
     if (!peerConnection) return;
     
-    const connectionState = peerConnection.connectionState;
-    const iceConnectionState = peerConnection.iceConnectionState;
-    const iceGatheringState = peerConnection.iceGatheringState;
+    const connectionState = webRTCManager.getPeerConnection()?.connectionState;
+    const iceConnectionState = webRTCManager.getPeerConnection()?.iceConnectionState;
+    const iceGatheringState = webRTCManager.getPeerConnection()?.iceGatheringState;
     
     if (connectionState === 'connected') {
       const connectionType = await getConnectionType();
@@ -1534,9 +1570,9 @@ async function createPeerConnection() {
     });
     
     // 通話中の場合はデバイスを切り替え
-    if (sessionActive && mediaManager.getLocalStream() && peerConnection) {
+    if (sessionActive && mediaManager.getLocalStream() && webRTCManager.getPeerConnection()) {
       try {
-        await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, peerConnection);
+        await mediaManager.switchDeviceDuringCall(videoChanged, audioChanged, webRTCManager.getPeerConnection());
       } catch (error) {
         console.error('通話中のデバイス切り替えエラー:', error);
         alert('デバイスの切り替えに失敗しました: ' + error.message);
