@@ -372,7 +372,7 @@ class WebRTCManager {
     this.iceGatheringTimeout = null;
   }
 
-  async createPeerConnection(elements, updateStatus) {
+  async createPeerConnection(elements) {
     this.peerConnection = new RTCPeerConnection({ 
       iceServers: Config.STUN_SERVERS,
       iceCandidatePoolSize: 10, // ICE候補のプールサイズを増やす
@@ -458,13 +458,13 @@ class WebRTCManager {
       }
     };
     
-    this.setupConnectionEventHandlers(updateStatus);
+    this.setupConnectionEventHandlers();
   }
 
-  setupConnectionEventHandlers(updateStatus) {
+  setupConnectionEventHandlers() {
     this.peerConnection.onconnectionstatechange = () => {
       console.log('接続状態:', this.peerConnection.connectionState);
-      updateStatus(`接続状態: ${this.peerConnection.connectionState}`);
+      uiManager.updateStatus(`接続状態: ${this.peerConnection.connectionState}`);
       
       if (this.peerConnection.connectionState === 'connected') {
         sessionManager.sessionActive = true;
@@ -485,13 +485,13 @@ class WebRTCManager {
             
             if (sessionManager.isHost) {
               // ホストは最初からやり直し
-              updateStatus('参加者が退室しました。新しいセッションを開始中...');
+              uiManager.updateStatus('参加者が退室しました。新しいセッションを開始中...');
               setTimeout(() => {
                 restartHostSession();
               }, 1000);
             } else {
               // ゲストは接続失敗として処理
-              updateStatus('接続が切断されました');
+              uiManager.updateStatus('接続が切断されました');
               cleanup();
             }
           } else {
@@ -811,6 +811,110 @@ class ASCIIConverter {
   }
 }
 
+// UIManager class for DOM operations
+class UIManager {
+  constructor(elements) {
+    this.elements = elements;
+  }
+
+  updateStatus(text) {
+    this.elements.statusText.textContent = text;
+    this.elements.statusText2.textContent = text;
+  }
+
+  toggleButtons(enabled) {
+    this.elements.hostBtn.disabled = !enabled;
+    this.elements.joinBtn.disabled = !enabled;
+    this.elements.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
+    this.elements.clearBtn.style.display = enabled ? 'none' : 'inline-block';
+  }
+
+  adjustAAFontSize() {
+    const aaDisplays = document.querySelectorAll('.aa-display');
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight;
+    
+    // モバイルの場合は個別に調整
+    if (containerWidth <= 768) {
+      this.adjustMobileAASize();
+      return;
+    }
+    
+    // デスクトップの場合
+    let optimalFontSize = 10;
+    
+    // 画面サイズに基づいて基本フォントサイズを計算
+    if (containerWidth >= 1920) {
+      optimalFontSize = Math.min(14, containerHeight / 60);
+    } else if (containerWidth >= 1366) {
+      optimalFontSize = Math.min(12, containerHeight / 65);
+    } else if (containerWidth >= 1024) {
+      optimalFontSize = Math.min(10, containerHeight / 70);
+    } else {
+      optimalFontSize = Math.min(8, containerHeight / 75);
+    }
+    
+    // 最小・最大値の制限
+    optimalFontSize = Math.max(6, Math.min(16, optimalFontSize));
+    
+    aaDisplays.forEach(display => {
+      display.style.setProperty('--aa-font-size', `${optimalFontSize}px`);
+    });
+  }
+
+  adjustMobileAASize() {
+    const remoteAA = this.elements.remoteAA;
+    const localAA = this.elements.localAA;
+    
+    // 利用可能な高さを計算
+    const viewportHeight = window.innerHeight;
+    const controlsHeight = 60;
+    const statusHeight = 40;
+    const availableHeight = viewportHeight - controlsHeight - statusHeight;
+    
+    // リモート（相手）用のフォントサイズ（優先的に大きく）
+    const remoteTargetHeight = Math.min(availableHeight * 0.6, 400);
+    let remoteFontSize = Math.floor(remoteTargetHeight / 60);
+    remoteFontSize = Math.max(4, Math.min(12, remoteFontSize));
+    
+    // ローカル（自分）用のフォントサイズ（残りスペース）
+    const localTargetHeight = availableHeight - remoteTargetHeight - 20;
+    let localFontSize = Math.floor(localTargetHeight / 60);
+    localFontSize = Math.max(3, Math.min(8, localFontSize));
+    
+    // CSS変数を設定
+    remoteAA.style.setProperty('--remote-aa-font-size', `${remoteFontSize}px`);
+    localAA.style.setProperty('--aa-font-size', `${localFontSize}px`);
+  }
+
+  openDeviceDialog() {
+    this.elements.deviceDialog.style.display = 'flex';
+  }
+
+  closeDeviceDialog() {
+    this.elements.deviceDialog.style.display = 'none';
+  }
+
+  openHelpDialog() {
+    this.elements.helpDialog.style.display = 'flex';
+  }
+
+  closeHelpDialog() {
+    this.elements.helpDialog.style.display = 'none';
+  }
+
+  loadKeywordFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyword = urlParams.get('k');
+    if (keyword) {
+      this.elements.keyword.value = keyword;
+      this.elements.keyword.readOnly = true; // 編集不可に設定
+      this.elements.clearBtn.style.display = 'inline-block'; // クリアボタン表示
+      console.log('URLからキーワードを読み込み:', keyword);
+    }
+  }
+}
+
 
 // Global instances
 const mediaManager = new MediaManager();
@@ -858,6 +962,7 @@ const elements = {
 
 const ctx = elements.canvas.getContext('2d');
 const asciiConverter = new ASCIIConverter(elements.canvas, ctx);
+const uiManager = new UIManager(elements);
 
 
 // デバイス選択肢を更新
@@ -959,12 +1064,12 @@ function addPollingInterval(intervalId) {
     if (!await mediaManager.startCamera()) return;
     
     sessionManager.startSession(true, keyword);
-    updateStatus('接続準備中...');
-    toggleButtons(false);
+    uiManager.updateStatus('接続準備中...');
+    uiManager.toggleButtons(false);
     
     // セッショントークンは startSession で生成済み
     
-    await webRTCManager.createPeerConnection(elements, updateStatus);
+    await webRTCManager.createPeerConnection(elements);
     webRTCManager.setupDataChannel();
     
     // オファー作成時のオプションを追加
@@ -993,7 +1098,7 @@ function addPollingInterval(intervalId) {
             if (errorText.includes('Another sender has been connected')) {
               // 既存ホストが存在
               const suggestedKeyword = Utility.generateSuggestedKeyword(keyword);
-              updateStatus('エラー: このキーワードは既に使用されています');
+              uiManager.updateStatus('エラー: このキーワードは既に使用されています');
               
               const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
               `以下のような別のキーワードを試してください：\n` +
@@ -1013,12 +1118,12 @@ function addPollingInterval(intervalId) {
       }
       
       // その他のエラーの場合は表示して終了
-      updateStatus('接続エラー: ' + error.message);
+      uiManager.updateStatus('接続エラー: ' + error.message);
       cleanup();
       return;
     }
     
-    updateStatus('参加者を待っています...');
+    uiManager.updateStatus('参加者を待っています...');
     startKeywordTimer();
     
     pollForAnswer();
@@ -1039,13 +1144,13 @@ function addPollingInterval(intervalId) {
     if (!mediaManager.getLocalStream()) {
       console.log('ローカルストリームを再取得中...');
       if (!await mediaManager.startCamera()) {
-        updateStatus('カメラアクセスエラー');
+        uiManager.updateStatus('カメラアクセスエラー');
         return;
       }
     }
     
     // 新しいセッションを開始
-    await webRTCManager.createPeerConnection(elements, updateStatus);
+    await webRTCManager.createPeerConnection(elements);
     webRTCManager.setupDataChannel();
     
     const offer = await webRTCManager.createOffer();
@@ -1059,7 +1164,7 @@ function addPollingInterval(intervalId) {
     });
     console.log('新しいオファー送信完了');
     
-    updateStatus('新しい参加者を待っています...');
+    uiManager.updateStatus('新しい参加者を待っています...');
     pollForAnswer();
   }
   
@@ -1078,8 +1183,8 @@ function addPollingInterval(intervalId) {
     if (!await mediaManager.startCamera()) return;
     
     sessionManager.startSession(false, keyword);
-    updateStatus('接続中...');
-    toggleButtons(false);
+    uiManager.updateStatus('接続中...');
+    uiManager.toggleButtons(false);
     
     // シンプルにポーリングで検索
     startJoinPolling();
@@ -1095,7 +1200,7 @@ function addPollingInterval(intervalId) {
       if (attempts > maxAttempts || sessionManager.connectionEstablished) {
         clearInterval(pollInterval);
         if (!sessionManager.connectionEstablished) {
-          updateStatus('タイムアウト: 参加者が見つかりませんでした');
+          uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
         }
         return;
       }
@@ -1109,7 +1214,7 @@ function addPollingInterval(intervalId) {
         const signal = await signalingManager.receiveSignal(answerPath);
         if (signal && signal.type === 'answer') {
           clearInterval(pollInterval);
-          updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
+          uiManager.updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
           await webRTCManager.setRemoteDescription(signal.answer);
           pollForIceCandidates();
         }
@@ -1126,14 +1231,14 @@ function addPollingInterval(intervalId) {
     let attempts = 0;
     const maxAttempts = 30;
     
-    updateStatus('オファーを検索しています...');
+    uiManager.updateStatus('オファーを検索しています...');
     
     const pollInterval = setInterval(async () => {
       attempts++;
       if (attempts > maxAttempts || sessionManager.connectionEstablished) {
         clearInterval(pollInterval);
         if (!sessionManager.connectionEstablished) {
-          updateStatus('タイムアウト: セッションが見つかりませんでした');
+          uiManager.updateStatus('タイムアウト: セッションが見つかりませんでした');
           cleanup();
         }
         return;
@@ -1146,7 +1251,7 @@ function addPollingInterval(intervalId) {
         
         if (signal && signal.type === 'offer') {
           clearInterval(pollInterval);
-          updateStatus('オファー受信 - 応答を準備中...');
+          uiManager.updateStatus('オファー受信 - 応答を準備中...');
           
           // ホストからのトークンを保存
           if (signal.token) {
@@ -1154,11 +1259,11 @@ function addPollingInterval(intervalId) {
             console.log('セッショントークン受信:', sessionManager.sessionToken);
           }
           
-          await webRTCManager.createPeerConnection(elements, updateStatus);
+          await webRTCManager.createPeerConnection(elements);
           webRTCManager.setupDataChannel();
           
           await webRTCManager.setRemoteDescription(signal.offer);
-          updateStatus('応答を作成中...');
+          uiManager.updateStatus('応答を作成中...');
           const answer = await webRTCManager.createAnswer();
           
           // トークンを使用した安全なパスで応答
@@ -1166,13 +1271,13 @@ function addPollingInterval(intervalId) {
           `${keyword}/${sessionManager.sessionToken}/answer` : 
           `${keyword}-answer`;
           
-          updateStatus('応答を送信中...');
+          uiManager.updateStatus('応答を送信中...');
           await signalingManager.sendSignal(answerPath, {
             type: 'answer',
             answer: answer
           });
           
-          updateStatus('ICE候補を交換中...');
+          uiManager.updateStatus('ICE候補を交換中...');
           pollForIceCandidates();
         }
       } catch (error) {
@@ -1206,7 +1311,7 @@ function addPollingInterval(intervalId) {
         if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
           console.log('ICE候補受信:', signal.candidates.length, '個');
           clearInterval(pollInterval);
-          updateStatus('ICE候補を受信 - 接続を確立中...');
+          uiManager.updateStatus('ICE候補を受信 - 接続を確立中...');
           for (const candidate of signal.candidates) {
             console.log('ICE候補追加:', candidate.type);
             try {
@@ -1216,7 +1321,7 @@ function addPollingInterval(intervalId) {
             }
           }
           console.log('ICE候補追加完了');
-          updateStatus('接続を確立中...');
+          uiManager.updateStatus('接続を確立中...');
         }
       } catch (error) {
         console.log('ICE候補受信エラー:', error.message);
@@ -1232,7 +1337,7 @@ function addPollingInterval(intervalId) {
     
     keywordTimer = setTimeout(() => {
       if (!sessionManager.sessionActive) {
-        updateStatus('キーワードの有効期限が切れました');
+        uiManager.updateStatus('キーワードの有効期限が切れました');
         cleanup();
       }
     }, 10 * 60 * 1000);
@@ -1278,9 +1383,9 @@ function addPollingInterval(intervalId) {
   function handleDisconnect() {
     clearReconnectInterval();
     if (sessionManager.isHost) {
-      updateStatus('セッション終了');
+      uiManager.updateStatus('セッション終了');
     } else {
-      updateStatus('ホストが退室しました');
+      uiManager.updateStatus('ホストが退室しました');
     }
     cleanup();
   }
@@ -1293,13 +1398,13 @@ function addPollingInterval(intervalId) {
   }
   
   function leaveSession() {
-    updateStatus('退室しました');
+    uiManager.updateStatus('退室しました');
     cleanup();
     
     // ページリロードではなく、状態をリセット
     setTimeout(() => {
-      updateStatus('未接続');
-      toggleButtons(true);
+      uiManager.updateStatus('未接続');
+      uiManager.toggleButtons(true);
     }, 100);
   }
   
@@ -1343,7 +1448,7 @@ function addPollingInterval(intervalId) {
     clearKeywordTimer();
     clearReconnectInterval();
     
-    toggleButtons(true);
+    uiManager.toggleButtons(true);
   }
   
   function updateStatus(text) {
@@ -1394,11 +1499,11 @@ function addPollingInterval(intervalId) {
       
       if (connectionType) {
         if (shouldUpdateStatus) {
-          updateStatus(`接続完了 (${connectionType})`);
+          uiManager.updateStatus(`接続完了 (${connectionType})`);
         }
       } else {
         if (shouldUpdateStatus) {
-          updateStatus('接続完了');
+          uiManager.updateStatus('接続完了');
         }
       }
     } else {
@@ -1591,7 +1696,7 @@ function addPollingInterval(intervalId) {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-      adjustAAFontSize();
+      uiManager.adjustAAFontSize();
     }, 1000);
   });
   
@@ -1601,7 +1706,7 @@ function addPollingInterval(intervalId) {
     window.visualViewport.addEventListener('resize', () => {
       clearTimeout(viewportResizeTimeout);
       viewportResizeTimeout = setTimeout(() => {
-        adjustAAFontSize();
+        uiManager.adjustAAFontSize();
       }, 1000);
     });
   }
@@ -1703,8 +1808,8 @@ function addPollingInterval(intervalId) {
   });
   
   // ページ読み込み時に実行
-  loadKeywordFromURL();
+  uiManager.loadKeywordFromURL();
   asciiConverter.startConversion(elements.localVideo, elements.remoteVideo, elements.localAA, elements.remoteAA);
-  adjustAAFontSize();
+  uiManager.adjustAAFontSize();
   mediaManager.getAvailableDevices();
   
