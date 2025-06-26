@@ -725,7 +725,9 @@ class SignalingManager {
 
     if (!response.ok) {
       console.error('送信エラー:', response.status, response.statusText);
-      throw new Error('シグナル送信エラー');
+      const error = new Error('シグナル送信エラー');
+      error.status = response.status;
+      throw error;
     }
     console.log('送信成功:', keyword);
   }
@@ -1405,37 +1407,13 @@ async function hostSession() {
     });
     console.log('オファー送信完了');
   } catch (error) {
-    // 400エラーをチェック（既存ホストの検出）
-    if (error.message.includes('シグナル送信エラー')) {
-      try {
-        const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ type: 'offer', offer: offer, token: sessionToken })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          if (errorText.includes('Another sender has been connected')) {
-            // 既存ホストが存在
-            const suggestedKeyword = Utility.generateSuggestedKeyword(keyword);
-            uiManager.updateStatus('エラー: このキーワードは既に使用されています');
-
-            const message = `このキーワード「${keyword}」は既に他のユーザーがホストしています。\n\n` +
-              `以下のような別のキーワードを試してください：\n` +
-              `• ${suggestedKeyword}\n` +
-              `• ${keyword}-room\n` +
-              `• ${keyword}${Math.floor(Math.random() * 100)}\n\n` +
-              `または、そのセッションに「参加する」ボタンで参加することもできます。`;
-
-            alert(message);
-            cleanup();
-            return;
-          }
-        }
-      } catch (checkError) {
-        console.log('既存ホスト確認エラー:', checkError.message);
-      }
+    console.log('オファー送信エラー:', error.status, error.message);
+    
+    // 409エラーの場合は既存ホストが存在
+    if (error.status === 409) {
+      uiManager.updateStatus('エラー: このキーワードは既に使用されています');
+      cleanup();
+      return;
     }
 
     // その他のエラーの場合は表示して終了
