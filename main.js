@@ -704,7 +704,7 @@ class WebRTCManager {
   }
 }
 
-// SignalingManager class for ppng.io communication
+// SignalingManager class for piping server communication
 class SignalingManager {
   constructor() {
     this.abortController = null;
@@ -773,7 +773,7 @@ class SignalingManager {
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
-      console.log('ppng.io接続をキャンセルしました');
+      console.log('piping serverへの接続をキャンセルしました');
     }
   }
 }
@@ -1751,7 +1751,7 @@ function leaveSession() {
 function cleanup() {
   stopAllPolling(); // 全ポーリング停止
 
-  // 進行中のppng.io接続をキャンセル
+  // 進行中のpiping serverへの接続をキャンセル
   signalingManager.abortCurrentRequest();
 
   // ASCII変換を停止
