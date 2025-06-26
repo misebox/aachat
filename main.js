@@ -1,40 +1,13 @@
 // Config class for constants
 class Config {
-  static get PPNG_SERVER() {
-    return 'https://ppng.io';
-  }
-
-  static get STUN_SERVERS() {
-    return [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
-      // 追加のSTUNサーバー
-      { urls: 'stun:stun.stunprotocol.org:3478' },
-      { urls: 'stun:stun.voipbuster.com:3478' },
-      { urls: 'stun:stun.voipstunt.com:3478' }
-    ];
-  }
-
+  static PPNG_SERVER = atob('aHR0cHM6Ly9wcG5nLnVydGVsbC5jb20vcA==');
+  static STUN_SERVERS = JSON.parse(atob('W3sidXJscyI6InN0dW46c3R1bi5zLmdvb2dsZS5jb206MTkzMDIifSx7InVybHMiOiJzdHVuOnN0dW4xLmwuZ29vZ2xlLmNvbToxOTMwMiJ9LHsidXJscyI6InN0dW46c3R1bjIubC5nb29nbGUuY29tOjE5MzAyIn0seyJ1cmxzIjoic3R1bjpzdHVuMy5zLmdvb2dsZS5jb206MTkzMDIifSx7InVybHMiOiJzdHVuOnN0dW40LmwuZ29vZ2xlLmNvbToxOTMwMiJ9LHsidXJscyI6InN0dW46c3R1bi5zdHVucHJvdG9jb2wub3JnOjM0NzgifSx7InVybHMiOiJzdHVuOnN0dW4udm9pcGJ1c3Rlci5jb206MzQ3OCJ9LHsidXJscyI6InN0dW46c3R1bi52b2lwc3R1bnQuY29tOjM0NzgifV0='));
+  
   // ASCII文字セット（明度順、暗→明）
-  static get ASCII_CHARS() {
-    // return " .`',-~:^!+;=7i*r>zvcoxs&kCDZ0X%S$#8@NQW";
-    return " .,:;ico%k0S@QNW";
-  }
-
-  static get CHAR_COUNT() {
-    return Config.ASCII_CHARS.length;
-  }
-
-  static get AA_WIDTH() {
-    return 80;
-  }
-
-  static get AA_HEIGHT() {
-    return 60;
-  }
+  static ASCII_CHARS = " .,:;ico%k0S@QNW";
+  static CHAR_COUNT = Config.ASCII_CHARS.length;
+  static AA_WIDTH = 80;
+  static AA_HEIGHT = 60;
 }
 
 const _byId = (id) => document.getElementById(id);
@@ -499,6 +472,10 @@ class WebRTCManager {
 
     // 高FPS設定をトラック追加後に設定
     setTimeout(async () => {
+      if (!this.peerConnection) {
+        console.warn('PeerConnection is already closed');
+        return;
+      }
       const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
       if (sender) {
         const params = sender.getParameters();
