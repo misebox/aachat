@@ -1244,6 +1244,11 @@ class UIManager {
       this.isKeywordFromURL = true; // URL由来のキーワードフラグ
       Elm.clearBtn.style.display = 'inline-block'; // クリアボタン表示
       console.log('URLからキーワードを読み込み:', keyword);
+      
+      // 接続ボタンにフォーカス（少し遅延してDOMが準備完了してから）
+      setTimeout(() => {
+        Elm.connectBtn.focus();
+      }, 100);
     } else {
       this.isKeywordFromURL = false;
     }
