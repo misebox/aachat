@@ -1590,14 +1590,23 @@ async function attemptGuestRole(keyword) {
 async function pollForAnswer() {
   const keyword = Elm.keyword.value;
   let attempts = 0;
-  const maxAttempts = 30;
+  const maxAttempts = 300; // 10分間待機（300回×2秒=600秒）
 
   const pollInterval = setInterval(async () => {
     attempts++;
-    if (attempts > maxAttempts || sessionManager.connectionEstablished) {
+    
+    // セッションタイムアウトまたは接続完了でポーリング終了
+    const isSessionExpired = sessionManager.isSessionExpired();
+    if (attempts > maxAttempts || sessionManager.connectionEstablished || isSessionExpired) {
       clearInterval(pollInterval);
       if (!sessionManager.connectionEstablished) {
-        uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
+        if (isSessionExpired) {
+          uiManager.updateStatus('セッション時間が終了しました');
+          cleanup();
+        } else {
+          uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
+          cleanup();
+        }
       }
       return;
     }
