@@ -1659,8 +1659,20 @@ async function startJoinPolling() {
           
         } catch (error) {
           console.error('ホストロール切り替えエラー:', error);
-          uiManager.updateStatus('接続に失敗しました');
-          cleanup();
+          
+          if (error.status === 409) {
+            // 他の人が既にホストになった場合、再度ゲストとして試行
+            console.log('他の人がホストになったため、再度ゲストとして試行');
+            uiManager.updateStatus('他の参加者がホストになりました。再接続中...');
+            sessionManager.isHost = false;
+            
+            // 新しいポーリングを開始（リトライ回数リセット）
+            attempts = 0; 
+            uiManager.updateStatus('オファーを検索しています...');
+          } else {
+            uiManager.updateStatus('接続に失敗しました');
+            cleanup();
+          }
         }
       }
       return;
@@ -1871,8 +1883,17 @@ async function promoteGuestToHost() {
     
   } catch (error) {
     console.error('ホスト昇格エラー:', error);
-    uiManager.updateStatus('ホスト昇格に失敗しました');
-    cleanup();
+    
+    if (error.status === 409) {
+      // 他の人が既にホストになった場合、ゲストとして再試行
+      console.log('他の人が新ホストになったため、ゲストとして参加試行');
+      uiManager.updateStatus('他の参加者がホストになりました。参加者として接続中...');
+      sessionManager.isHost = false; // ゲストに戻す
+      startJoinPolling();
+    } else {
+      uiManager.updateStatus('ホスト昇格に失敗しました');
+      cleanup();
+    }
   }
 }
 
