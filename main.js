@@ -15,8 +15,7 @@ const _byId = (id) => document.getElementById(id);
 const Elm = {
   keyword: _byId('keyword'),
   clearBtn: _byId('clearBtn'),
-  hostBtn: _byId('hostBtn'),
-  joinBtn: _byId('joinBtn'),
+  connectBtn: _byId('connectBtn'),
   leaveBtn: _byId('leaveBtn'),
   statusText: _byId('statusText'),
   timer: _byId('timer'),
@@ -961,12 +960,10 @@ class UIManager {
   }
 
   toggleButtons(enabled) {
-    Elm.hostBtn.disabled = !enabled;
-    Elm.joinBtn.disabled = !enabled;
+    Elm.connectBtn.disabled = !enabled;
 
     // モバイルでもボタンを完全に非表示にする
-    Elm.hostBtn.style.display = enabled ? 'inline-block' : 'none';
-    Elm.joinBtn.style.display = enabled ? 'inline-block' : 'none';
+    Elm.connectBtn.style.display = enabled ? 'inline-block' : 'none';
     Elm.leaveBtn.style.display = enabled ? 'none' : 'inline-block';
     
     // クリアボタンはセッション中（enabled=false）には非表示
@@ -1492,6 +1489,92 @@ async function joinSession() {
   startJoinPolling();
 }
 
+// 自動ロール決定による統一接続関数
+async function connectSession() {
+  const keyword = Elm.keyword.value.trim();
+  if (!keyword) {
+    alert('キーワードを入力してください');
+    return;
+  }
+
+  // 既存ストリームのクリーンアップ
+  if (mediaManager.getLocalStream()) {
+    mediaManager.stopCamera();
+  }
+
+  if (!await mediaManager.startCamera()) return;
+
+  uiManager.updateStatus('接続中...');
+  uiManager.toggleButtons(false);
+
+  try {
+    // まずホストロールを試行
+    console.log('ホストロールを試行中:', keyword);
+    await attemptHostRole(keyword);
+  } catch (error) {
+    if (error.status === 409) {
+      // 既にホストが存在 → ゲストロールに自動切り替え
+      console.log('ホスト既存検出、ゲストロールに切り替え:', keyword);
+      uiManager.updateStatus('参加者として接続中...');
+      await attemptGuestRole(keyword);
+    } else {
+      // その他のエラー
+      uiManager.updateStatus('接続エラー: ' + error.message);
+      cleanup();
+      throw error;
+    }
+  }
+}
+
+// ホストロール試行
+async function attemptHostRole(keyword) {
+  sessionManager.startSession(true, keyword);
+  
+  // ASCII変換を開始
+  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
+
+  await webRTCManager.createPeerConnection();
+  webRTCManager.setupDataChannel();
+
+  const offer = await webRTCManager.createOffer();
+
+  console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
+  
+  // ここで409エラーが発生する可能性がある
+  await signalingManager.sendSignal(keyword, {
+    type: 'offer',
+    offer: offer,
+    token: sessionManager.sessionToken
+  });
+  
+  console.log('ホストとして接続成功');
+  uiManager.updateStatus('ホストとして接続 - 参加者を待っています...');
+  startKeywordTimer();
+  pollForAnswer();
+}
+
+// ゲストロール試行
+async function attemptGuestRole(keyword) {
+  // ホスト試行時の状態をクリーンアップ
+  cleanup();
+  
+  // 新しいストリームを取得
+  if (!await mediaManager.startCamera()) {
+    throw new Error('カメラアクセスエラー');
+  }
+
+  sessionManager.startSession(false, keyword);
+  
+  // ASCII変換を開始
+  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
+
+  uiManager.updateStatus('参加者として接続中...');
+  uiManager.toggleButtons(false);
+
+  // ゲストとしてポーリング開始
+  startJoinPolling();
+}
+
 async function pollForAnswer() {
   const keyword = Elm.keyword.value;
   let attempts = 0;
@@ -1839,14 +1922,9 @@ function enableAutoplayAfterUserGesture() {
   playVideoSafely(Elm.remoteVideo, 'リモート（ユーザー操作後）');
 }
 
-Elm.hostBtn.addEventListener('click', () => {
+Elm.connectBtn.addEventListener('click', () => {
   enableAutoplayAfterUserGesture();
-  hostSession();
-});
-
-Elm.joinBtn.addEventListener('click', () => {
-  enableAutoplayAfterUserGesture();
-  joinSession();
+  connectSession();
 });
 
 Elm.leaveBtn.addEventListener('click', leaveSession);
