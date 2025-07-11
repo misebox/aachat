@@ -603,9 +603,9 @@ class WebRTCManager {
               restartHostSession();
             }, 1000);
           } else {
-            // ゲストは接続失敗として処理
-            uiManager.updateStatus('接続が切断されました');
-            cleanup();
+            // ゲストは新ホストに昇格
+            uiManager.updateStatus('ホストが退室しました。新ホストとして待機中...');
+            promoteGuestToHost();
           }
         } else {
           handleDisconnect();
@@ -1790,16 +1790,57 @@ function handleDisconnect() {
   clearReconnectInterval();
   if (sessionManager.isHost) {
     uiManager.updateStatus('セッション終了');
+    cleanup();
   } else {
-    uiManager.updateStatus('ホストが退室しました');
+    uiManager.updateStatus('ホストが退室しました。新ホストとして待機中...');
+    promoteGuestToHost();
   }
-  cleanup();
 }
 
 function clearReconnectInterval() {
   if (aaChat.reconnectInterval) {
     clearInterval(aaChat.reconnectInterval);
     aaChat.reconnectInterval = null;
+  }
+}
+
+// ゲストを新ホストに昇格させる関数
+async function promoteGuestToHost() {
+  try {
+    console.log('ゲストを新ホストに昇格中...');
+    
+    // 現在の接続をクリーンアップ（ローカルストリームは保持）
+    stopAllPolling();
+    webRTCManager.close();
+    
+    // ホストとして再設定
+    sessionManager.isHost = true;
+    sessionManager.connectionEstablished = false;
+    sessionManager.sessionToken = Utility.generateSessionToken(); // 新しいトークン生成
+    
+    // 新しいWebRTC接続を作成
+    await webRTCManager.createPeerConnection();
+    webRTCManager.setupDataChannel();
+    
+    // オファーを作成して送信
+    const offer = await webRTCManager.createOffer();
+    const keyword = sessionManager.currentKeyword;
+    
+    console.log('新ホストとしてオファー送信:', keyword);
+    await signalingManager.sendSignal(keyword, {
+      type: 'offer',
+      offer: offer,
+      token: sessionManager.sessionToken
+    });
+    
+    uiManager.updateStatus('新ホストとして参加者を待っています...');
+    startKeywordTimer();
+    pollForAnswer();
+    
+  } catch (error) {
+    console.error('ホスト昇格エラー:', error);
+    uiManager.updateStatus('ホスト昇格に失敗しました');
+    cleanup();
   }
 }
 
