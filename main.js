@@ -1518,10 +1518,17 @@ async function connectSession() {
     await attemptHostRole(keyword);
   } catch (error) {
     if (error.status === 409) {
-      // 既にホストが存在 → ゲストロールに自動切り替え
-      console.log('ホスト既存検出、ゲストロールに切り替え:', keyword);
-      uiManager.updateStatus('参加者として接続中...');
-      await attemptGuestRole(keyword);
+      // 既にホストが存在する可能性があるが、同時アクセスの場合もある
+      console.log('ホスト競合検出、少し待ってからゲストロールを試行:', keyword);
+      uiManager.updateStatus('他の参加者を確認中...');
+      
+      // ランダムな遅延（500-1500ms）でタイミングをずらす
+      const delay = 500 + Math.random() * 1000;
+      setTimeout(async () => {
+        console.log('ゲストロールに切り替え:', keyword);
+        uiManager.updateStatus('参加者として接続中...');
+        await attemptGuestRole(keyword);
+      }, delay);
     } else {
       // その他のエラー
       uiManager.updateStatus('接続エラー: ' + error.message);
@@ -1628,8 +1635,33 @@ async function startJoinPolling() {
     if (attempts > maxAttempts || sessionManager.connectionEstablished) {
       clearInterval(pollInterval);
       if (!sessionManager.connectionEstablished) {
-        uiManager.updateStatus('タイムアウト: セッションが見つかりませんでした');
-        cleanup();
+        console.log('オファー検索タイムアウト、ホストロールを試行');
+        uiManager.updateStatus('セッションが見つからないため、ホストとして待機中...');
+        
+        try {
+          // ホストロールを試行
+          sessionManager.isHost = true;
+          sessionManager.sessionToken = Utility.generateSessionToken();
+          
+          await webRTCManager.createPeerConnection();
+          webRTCManager.setupDataChannel();
+          const offer = await webRTCManager.createOffer();
+          
+          await signalingManager.sendSignal(keyword, {
+            type: 'offer',
+            offer: offer,
+            token: sessionManager.sessionToken
+          });
+          
+          uiManager.updateStatus('ホストとして参加者を待っています...');
+          startKeywordTimer();
+          pollForAnswer();
+          
+        } catch (error) {
+          console.error('ホストロール切り替えエラー:', error);
+          uiManager.updateStatus('接続に失敗しました');
+          cleanup();
+        }
       }
       return;
     }
