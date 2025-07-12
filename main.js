@@ -2292,6 +2292,26 @@ if (window.visualViewport) {
   });
 }
 
+// ページ終了時のクリーンアップ
+function performCleanup() {
+  console.log('クリーンアップ実行');
+  stopAllPolling();
+  signalingManager.abortCurrentRequest();
+  if (mediaManager.getLocalStream()) {
+    mediaManager.stopCamera();
+  }
+  webRTCManager.close();
+}
+
+window.addEventListener('beforeunload', performCleanup);
+
+// ページが非表示になった時もクリーンアップ（モバイル対応）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    performCleanup();
+  }
+});
+
 // ページ読み込み時に実行
 uiManager.loadKeywordFromURL();
 asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
