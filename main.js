@@ -1612,6 +1612,15 @@ async function pollForAnswer() {
     }
 
     try {
+      // 10回に1回、他のホストとの競合をチェック
+      if (attempts % 10 === 0) {
+        await checkForHostConflict(keyword, pollInterval);
+        if (!sessionManager.isHost) {
+          // ゲストに降格した場合、このポーリングを終了
+          return;
+        }
+      }
+
       // トークンベースのパスと旧形式の両方をチェック
       const answerPath = sessionManager.sessionToken ?
         `${keyword}/${sessionManager.sessionToken}/answer` :
@@ -1630,6 +1639,55 @@ async function pollForAnswer() {
   }, 2000);
 
   addPollingInterval(pollInterval);
+}
+
+// ホスト競合チェック関数
+async function checkForHostConflict(keyword, currentPollInterval) {
+  try {
+    console.log('ホスト競合チェック実行:', keyword);
+    
+    // 基本キーワードで他のオファーをチェック
+    const otherOffer = await signalingManager.receiveSignal(keyword);
+    
+    if (otherOffer && otherOffer.type === 'offer' && otherOffer.token !== sessionManager.sessionToken) {
+      console.log('他のホストを検出、ゲストに降格:', otherOffer.token);
+      
+      // 優先度で判定（セッショントークンの文字列比較）
+      const shouldDemote = sessionManager.sessionToken > otherOffer.token;
+      
+      if (shouldDemote) {
+        clearInterval(currentPollInterval);
+        uiManager.updateStatus('他のホストを検出、参加者として接続中...');
+        
+        // ゲストに降格
+        sessionManager.isHost = false;
+        sessionManager.sessionToken = otherOffer.token; // 相手のトークンを使用
+        
+        // 既存の接続をクリーンアップ
+        stopAllPolling();
+        webRTCManager.close();
+        
+        // ゲストとして接続開始
+        await webRTCManager.createPeerConnection();
+        webRTCManager.setupDataChannel();
+        await webRTCManager.setRemoteDescription(otherOffer.offer);
+        
+        const answer = await webRTCManager.createAnswer();
+        const answerPath = `${keyword}/${otherOffer.token}/answer`;
+        
+        await signalingManager.sendSignal(answerPath, {
+          type: 'answer',
+          answer: answer
+        });
+        
+        uiManager.updateStatus('ICE候補を交換中...');
+        pollForIceCandidates();
+      }
+    }
+  } catch (error) {
+    // 競合チェックエラーは無視（通常の動作を継続）
+    console.log('ホスト競合チェックエラー（無視）:', error.message);
+  }
 }
 
 async function startJoinPolling() {
