@@ -1591,9 +1591,16 @@ async function pollForAnswer() {
   const keyword = Elm.keyword.value;
   let attempts = 0;
   const maxAttempts = 300; // 10分間待機（300回×2秒=600秒）
+  const tokenResetThreshold = 5; // 10秒後にトークンなし通信を試行
 
   const pollInterval = setInterval(async () => {
     attempts++;
+    
+    // 10秒後にトークンをリセットして再送信
+    if (attempts === tokenResetThreshold && sessionManager.sessionToken) {
+      console.log('10秒経過、トークンなし通信に切り替え');
+      await resetToTokenlessMode(keyword);
+    }
     
     // セッションタイムアウトまたは接続完了でポーリング終了
     const isSessionExpired = sessionManager.isSessionExpired();
@@ -1622,9 +1629,12 @@ async function pollForAnswer() {
       }
 
       // トークンベースのパスと旧形式の両方をチェック
-      const answerPath = sessionManager.sessionToken ?
-        `${keyword}/${sessionManager.sessionToken}/answer` :
-        `${keyword}-answer`;
+      let answerPath;
+      if (sessionManager.sessionToken) {
+        answerPath = `${keyword}/${sessionManager.sessionToken}/answer`;
+      } else {
+        answerPath = `${keyword}-answer`;
+      }
 
       const signal = await signalingManager.receiveSignal(answerPath);
       if (signal && signal.type === 'answer') {
@@ -1687,6 +1697,36 @@ async function checkForHostConflict(keyword, currentPollInterval) {
   } catch (error) {
     // 競合チェックエラーは無視（通常の動作を継続）
     console.log('ホスト競合チェックエラー（無視）:', error.message);
+  }
+}
+
+// トークンなし通信モードにリセット
+async function resetToTokenlessMode(keyword) {
+  try {
+    console.log('トークンなし通信モードに切り替え:', keyword);
+    uiManager.updateStatus('通信方式を変更中...');
+    
+    // トークンをクリア
+    const oldToken = sessionManager.sessionToken;
+    sessionManager.sessionToken = null;
+    
+    // 新しいオファーを作成（トークンなし）
+    const offer = await webRTCManager.createOffer();
+    
+    // シンプルなキーワードでオファーを再送信
+    await signalingManager.sendSignal(keyword, {
+      type: 'offer',
+      offer: offer,
+      token: null
+    });
+    
+    console.log('トークンなしオファー送信完了');
+    uiManager.updateStatus('参加者を待っています（互換モード）...');
+    
+  } catch (error) {
+    console.error('トークンなし通信切り替えエラー:', error);
+    // エラー時は元のトークンを復元
+    sessionManager.sessionToken = oldToken;
   }
 }
 
@@ -1754,10 +1794,13 @@ async function startJoinPolling() {
         clearInterval(pollInterval);
         uiManager.updateStatus('オファー受信 - 応答を準備中...');
 
-        // ホストからのトークンを保存
+        // ホストからのトークンを保存（nullの場合もある）
         if (signal.token) {
           sessionManager.sessionToken = signal.token;
           console.log('セッショントークン受信:', sessionManager.sessionToken);
+        } else {
+          sessionManager.sessionToken = null;
+          console.log('トークンなし通信モードで受信');
         }
 
         await webRTCManager.createPeerConnection();
@@ -1767,10 +1810,13 @@ async function startJoinPolling() {
         uiManager.updateStatus('応答を作成中...');
         const answer = await webRTCManager.createAnswer();
 
-        // トークンを使用した安全なパスで応答
-        const answerPath = sessionManager.sessionToken ?
-          `${keyword}/${sessionManager.sessionToken}/answer` :
-          `${keyword}-answer`;
+        // トークンに応じてパスを決定
+        let answerPath;
+        if (sessionManager.sessionToken) {
+          answerPath = `${keyword}/${sessionManager.sessionToken}/answer`;
+        } else {
+          answerPath = `${keyword}-answer`;
+        }
 
         uiManager.updateStatus('応答を送信中...');
         await signalingManager.sendSignal(answerPath, {
