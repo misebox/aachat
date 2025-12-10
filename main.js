@@ -838,6 +838,17 @@ class SignalingManager {
       this.abortController = new AbortController();
     }
 
+    // クライアント側タイムアウト（サーバーがX-Timeoutをサポートしない場合のフォールバック）
+    let timeoutId = null;
+    if (useAbortController && this.abortController) {
+      timeoutId = setTimeout(() => {
+        console.log('クライアント側タイムアウト:', keyword);
+        if (this.abortController) {
+          this.abortController.abort();
+        }
+      }, timeout * 1000);
+    }
+
     try {
       const fetchOptions = {
         headers: {
@@ -850,6 +861,11 @@ class SignalingManager {
       }
 
       const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, fetchOptions);
+
+      // タイムアウトタイマーをクリア
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         if (response.status === 400 || response.status === 408) {
@@ -868,8 +884,12 @@ class SignalingManager {
       console.log('受信データ:', data.type);
       return data;
     } catch (error) {
+      // タイムアウトタイマーをクリア
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (error.name === 'AbortError') {
-        console.log('受信キャンセル:', keyword);
+        console.log('受信キャンセル/タイムアウト:', keyword);
         return null;
       }
       console.error('受信エラー:', error);
@@ -1716,7 +1736,7 @@ async function attemptGuestRole(keyword, skipCleanup = false) {
 async function pollForAnswer() {
   const keyword = Elm.keyword.value;
   let attempts = 0;
-  const maxAttempts = 20; // ロングポーリング20回（20×30秒=10分）
+  const maxAttempts = 120; // ポーリング120回（5秒×120=10分）
   const tokenResetThreshold = 1; // 最初のタイムアウト後にトークンなし通信を試行
   let isPolling = true;
 
@@ -1770,7 +1790,7 @@ async function pollForAnswer() {
         }
 
         // ロングポーリング（30秒タイムアウト）
-        const signal = await signalingManager.receiveSignal(answerPath, { timeout: 30 });
+        const signal = await signalingManager.receiveSignal(answerPath, { timeout: 5 });
         if (signal && signal.type === 'answer') {
           isPolling = false;
           // オファーのキャンセルキーをクリア（受信完了）
@@ -1893,7 +1913,7 @@ async function resetToTokenlessMode(keyword) {
 async function startJoinPolling() {
   const keyword = sessionManager.currentKeyword;
   let attempts = 0;
-  const maxAttempts = 4; // ロングポーリング4回（4×30秒=2分）
+  const maxAttempts = 24; // ポーリング24回（5秒×24=2分）
   let isPolling = true;
 
   uiManager.updateStatus('オファーを検索しています...');
@@ -1952,7 +1972,7 @@ async function startJoinPolling() {
       try {
         // シンプルに基本キーワードのみを検索（ロングポーリング30秒）
         console.log('オファーを検索中:', keyword);
-        const signal = await signalingManager.receiveSignal(keyword, { timeout: 30 });
+        const signal = await signalingManager.receiveSignal(keyword, { timeout: 5 });
 
         if (signal && signal.type === 'offer') {
           isPolling = false;
