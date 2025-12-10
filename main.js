@@ -1,3 +1,14 @@
+// SignalingManager の存在確認
+if (typeof SignalingManager === 'undefined') {
+  console.error('SignalingManager が見つかりません。js/signaling.js の読み込みを確認してください。');
+  document.body.innerHTML = '<h1 style="color:red">エラー: js/signaling.js の読み込みに失敗</h1>';
+}
+
+// グローバルエラーハンドラ（モバイルデバッグ用）
+window.onerror = function(msg, url, line) {
+  console.error('エラー:', msg, url, line);
+};
+
 // Config class for constants
 class Config {
   static PPNG_SERVER = atob('aHR0cHM6Ly9wcG5nLnVydGVsbC5jb20vcA==');
@@ -72,22 +83,37 @@ class Utility {
     return baseKeyword + randomSuffix;
   }
 
-  // XOR暗号化用の関数
+  // XOR暗号化用の関数（UTF-8対応）
   static xorEncrypt(text, key) {
-    const encrypted = [];
-    for (let i = 0; i < text.length; i++) {
-      encrypted.push(String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    const encoder = new TextEncoder();
+    const textBytes = encoder.encode(text);
+    const keyBytes = encoder.encode(key);
+    const encrypted = new Uint8Array(textBytes.length);
+    for (let i = 0; i < textBytes.length; i++) {
+      encrypted[i] = textBytes[i] ^ keyBytes[i % keyBytes.length];
     }
-    return btoa(encrypted.join(''));
+    // Uint8Array を Base64 に変換
+    let binary = '';
+    for (let i = 0; i < encrypted.length; i++) {
+      binary += String.fromCharCode(encrypted[i]);
+    }
+    return btoa(binary);
   }
 
   static xorDecrypt(encryptedBase64, key) {
-    const encrypted = atob(encryptedBase64);
-    const decrypted = [];
-    for (let i = 0; i < encrypted.length; i++) {
-      decrypted.push(String.fromCharCode(encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    const binary = atob(encryptedBase64);
+    const encrypted = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      encrypted[i] = binary.charCodeAt(i);
     }
-    return decrypted.join('');
+    const encoder = new TextEncoder();
+    const keyBytes = encoder.encode(key);
+    const decrypted = new Uint8Array(encrypted.length);
+    for (let i = 0; i < encrypted.length; i++) {
+      decrypted[i] = encrypted[i] ^ keyBytes[i % keyBytes.length];
+    }
+    const decoder = new TextDecoder();
+    return decoder.decode(decrypted);
   }
 }
 
@@ -525,15 +551,13 @@ class WebRTCManager {
           console.log('ICE候補収集タイムアウト. 候補数:', this.iceCandidates.length);
           if (this.iceCandidates.length > 0) {
             const keyword = sessionManager.currentKeyword || Elm.keyword.value;
-            const iceKey = sessionManager.sessionToken ?
-              `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
-              `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
+            const iceKey = `${keyword}/ice-${sessionManager.isHost ? 'host' : 'guest'}`;
             console.log('ICE候補送信:', iceKey);
-            await signalingManager.sendSignal(iceKey, {
+            await signalingManager.send(iceKey, {
               type: 'ice-batch',
               candidates: this.iceCandidates,
               isHost: sessionManager.isHost
-            });
+            }, keyword, 30);
           }
         }, 3000);
       } else {
@@ -542,15 +566,13 @@ class WebRTCManager {
         console.log('ICE候補収集完了. 候補数:', this.iceCandidates.length);
         if (this.iceCandidates.length > 0) {
           const keyword = sessionManager.currentKeyword || Elm.keyword.value;
-          const iceKey = sessionManager.sessionToken ?
-            `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'host' : 'guest'}` :
-            `${keyword}-ice-${sessionManager.isHost ? 'host' : 'guest'}`;
+          const iceKey = `${keyword}/ice-${sessionManager.isHost ? 'host' : 'guest'}`;
           console.log('ICE候補送信:', iceKey);
-          await signalingManager.sendSignal(iceKey, {
+          await signalingManager.send(iceKey, {
             type: 'ice-batch',
             candidates: this.iceCandidates,
             isHost: sessionManager.isHost
-          });
+          }, keyword, 30);
         }
       }
     };
@@ -703,81 +725,7 @@ class WebRTCManager {
   }
 }
 
-// SignalingManager class for piping server communication
-class SignalingManager {
-  constructor() {
-    this.abortController = null;
-  }
-
-  async sendSignal(keyword, data) {
-    console.log('送信中:', keyword, 'データタイプ:', data.type);
-    const json = JSON.stringify(data);
-    const encrypted = Utility.xorEncrypt(json, keyword);
-
-    const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'text/plain'
-      },
-      body: encrypted
-    });
-
-    if (!response.ok) {
-      console.error('送信エラー:', response.status, response.statusText);
-      const error = new Error('シグナル送信エラー');
-      error.status = response.status;
-      throw error;
-    }
-    console.log('送信成功:', keyword);
-  }
-
-  async receiveSignal(keyword) {
-    console.log('受信試行:', keyword);
-
-    // AbortControllerを作成（既存のものがあればキャンセル）
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.abortController = new AbortController();
-
-    try {
-      const response = await fetch(`${Config.PPNG_SERVER}/aachat/${keyword}`, {
-        signal: this.abortController.signal
-      });
-
-      if (!response.ok) {
-        if (response.status === 400) {
-          console.log('受信結果: データなし (400)');
-          return null;
-        }
-        console.error('受信エラー:', response.status, response.statusText);
-        throw new Error('シグナル受信エラー');
-      }
-
-      console.log('受信成功:', keyword);
-      const encrypted = await response.text();
-      const decrypted = Utility.xorDecrypt(encrypted, keyword);
-      const data = JSON.parse(decrypted);
-      console.log('受信データ:', data.type);
-      return data;
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('受信キャンセル:', keyword);
-        return null;
-      }
-      console.error('受信エラー:', error);
-      throw error;
-    }
-  }
-
-  abortCurrentRequest() {
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-      console.log('piping serverへの接続をキャンセルしました');
-    }
-  }
-}
+// SignalingManager は js/signaling.js から読み込み
 
 // ASCIIConverter class for video processing
 class ASCIIConverter {
@@ -1277,7 +1225,7 @@ class AAChat {
     this.mediaManager = new MediaManager();
     this.webRTCManager = new WebRTCManager();
     this.sessionManager = new SessionManager();
-    this.signalingManager = new SignalingManager();
+    this.signalingManager = new SignalingManager(Config.PPNG_SERVER + '/aachat');
 
     // Initialize canvas and converters
     this.ctx = Elm.canvas.getContext('2d');
@@ -1376,124 +1324,6 @@ function addPollingInterval(intervalId) {
 
 
 
-async function hostSession() {
-  const keyword = Elm.keyword.value.trim();
-  if (!keyword) {
-    alert('キーワードを入力してください');
-    return;
-  }
-
-  if (!await mediaManager.startCamera()) return;
-
-  sessionManager.startSession(true, keyword);
-  uiManager.updateStatus('接続準備中...');
-  uiManager.toggleButtons(false);
-
-  // ASCII変換を開始（ホスト開始時に必要）
-  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
-
-  // セッショントークンは startSession で生成済み
-
-  await webRTCManager.createPeerConnection();
-  webRTCManager.setupDataChannel();
-
-  // オファー作成時のオプションを追加
-  const offer = await webRTCManager.createOffer();
-
-  console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
-  try {
-    await signalingManager.sendSignal(keyword, {
-      type: 'offer',
-      offer: offer,
-      token: sessionManager.sessionToken
-    });
-    console.log('オファー送信完了');
-  } catch (error) {
-    console.log('オファー送信エラー:', error.status, error.message);
-    
-    // 409エラーの場合は既存ホストが存在
-    if (error.status === 409) {
-      uiManager.updateStatus('エラー: このキーワードは既に使用されています');
-      cleanup();
-      return;
-    }
-
-    // その他のエラーの場合は表示して終了
-    uiManager.updateStatus('接続エラー: ' + error.message);
-    cleanup();
-    return;
-  }
-
-  uiManager.updateStatus('参加者を待っています...');
-  startKeywordTimer();
-
-  pollForAnswer();
-}
-
-async function restartHostSession() {
-  console.log('ホストセッション再開');
-
-  // 既存の接続をクリーンアップ
-  stopAllPolling();
-  webRTCManager.close();
-  // iceCandidates now managed by webRTCManager
-  sessionManager.connectionEstablished = false;
-  aaChat.isWaitingForGuest = false;
-  sessionManager.sessionToken = Utility.generateSessionToken();
-
-  // ローカルストリームが存在しない場合は再取得
-  if (!mediaManager.getLocalStream()) {
-    console.log('ローカルストリームを再取得中...');
-    if (!await mediaManager.startCamera()) {
-      uiManager.updateStatus('カメラアクセスエラー');
-      return;
-    }
-  }
-
-  // 新しいセッションを開始
-  await webRTCManager.createPeerConnection();
-  webRTCManager.setupDataChannel();
-
-  const offer = await webRTCManager.createOffer();
-
-  // 新しいトークンでオファーを送信
-  console.log('新しいオファーを送信中:', sessionManager.currentKeyword, 'トークン:', sessionManager.sessionToken);
-  await signalingManager.sendSignal(sessionManager.currentKeyword, {
-    type: 'offer',
-    offer: offer,
-    token: sessionManager.sessionToken
-  });
-  console.log('新しいオファー送信完了');
-
-  uiManager.updateStatus('新しい参加者を待っています...');
-  pollForAnswer();
-}
-
-async function joinSession() {
-  const keyword = Elm.keyword.value.trim();
-  if (!keyword) {
-    alert('キーワードを入力してください');
-    return;
-  }
-
-  // 既存ストリームのクリーンアップ
-  if (mediaManager.getLocalStream()) {
-    mediaManager.stopCamera();
-  }
-
-  if (!await mediaManager.startCamera()) return;
-
-  sessionManager.startSession(false, keyword);
-  uiManager.updateStatus('接続中...');
-  uiManager.toggleButtons(false);
-
-  // ASCII変換を再開（再参加時に必要）
-  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
-
-  // シンプルにポーリングで検索
-  startJoinPolling();
-}
-
 // 自動ロール決定による統一接続関数
 async function connectSession() {
   const keyword = Elm.keyword.value.trim();
@@ -1512,334 +1342,165 @@ async function connectSession() {
   uiManager.updateStatus('接続中...');
   uiManager.toggleButtons(false);
 
+  // ASCII変換を開始
+  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
+
   try {
-    // まずホストロールを試行
-    console.log('ホストロールを試行中:', keyword);
-    await attemptHostRole(keyword);
-  } catch (error) {
-    if (error.status === 409) {
-      // 既にホストが存在する可能性があるが、同時アクセスの場合もある
-      console.log('ホスト競合検出、少し待ってからゲストロールを試行:', keyword);
-      uiManager.updateStatus('他の参加者を確認中...');
-      
-      // ランダムな遅延（500-1500ms）でタイミングをずらす
-      const delay = 500 + Math.random() * 1000;
-      setTimeout(async () => {
-        console.log('ゲストロールに切り替え:', keyword);
-        uiManager.updateStatus('参加者として接続中...');
-        await attemptGuestRole(keyword);
-      }, delay);
+    // HEAD リクエストで既存オファーの存在をチェック
+    console.log('既存オファーをチェック中:', keyword);
+    const offerExists = await signalingManager.exists(keyword);
+
+    if (offerExists) {
+      // オファーが存在する → ゲストとして接続
+      console.log('既存オファー検出、ゲストロールで接続:', keyword);
+      await guestSession(keyword);
     } else {
-      // その他のエラー
-      uiManager.updateStatus('接続エラー: ' + error.message);
-      cleanup();
-      throw error;
+      // オファーが存在しない → ホストとして接続
+      console.log('オファーなし、ホストロールで接続:', keyword);
+      await hostSession(keyword);
     }
+  } catch (error) {
+    console.error('接続エラー:', error);
+    uiManager.updateStatus('接続エラー: ' + error.message);
+    cleanup();
   }
 }
 
-// ホストロール試行
-async function attemptHostRole(keyword) {
+// ホストセッション
+async function hostSession(keyword) {
   sessionManager.startSession(true, keyword);
-  
-  // ASCII変換を開始
-  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
 
   await webRTCManager.createPeerConnection();
   webRTCManager.setupDataChannel();
 
   const offer = await webRTCManager.createOffer();
 
-  console.log('オファーを送信中:', keyword, 'トークン:', sessionManager.sessionToken);
-  
-  // ここで409エラーが発生する可能性がある
-  await signalingManager.sendSignal(keyword, {
-    type: 'offer',
-    offer: offer,
-    token: sessionManager.sessionToken
-  });
-  
-  console.log('ホストとして接続成功');
-  uiManager.updateStatus('ホストとして接続 - 参加者を待っています...');
+  uiManager.updateStatus('ホストとして参加者を待っています...');
   startKeywordTimer();
-  pollForAnswer();
-}
 
-// ゲストロール試行
-async function attemptGuestRole(keyword) {
-  // ホスト試行時の状態をクリーンアップ
-  cleanup();
-  
-  // 新しいストリームを取得
-  if (!await mediaManager.startCamera()) {
-    throw new Error('カメラアクセスエラー');
+  // オファー送信ループ（タイムアウトしたら再送信）
+  while (sessionManager.sessionActive && !sessionManager.connectionEstablished) {
+    console.log('オファーを送信中:', keyword);
+    try {
+      const result = await signalingManager.send(keyword, {
+        type: 'offer',
+        offer: offer
+      }, keyword, 600);
+
+      if (result.success) {
+        console.log('オファーが受信された');
+        break;
+      }
+      // タイムアウト → 再送信
+      console.log('オファー送信タイムアウト、再送信...');
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('オファー送信キャンセル');
+        return;
+      }
+      console.error('オファー送信エラー:', error);
+      // エラー時も再試行
+    }
   }
 
-  sessionManager.startSession(false, keyword);
-  
-  // ASCII変換を開始
-  asciiConverter.startConversion(Elm.localVideo, Elm.remoteVideo, Elm.localAA, Elm.remoteAA);
+  if (!sessionManager.sessionActive) return;
 
-  uiManager.updateStatus('参加者として接続中...');
-  uiManager.toggleButtons(false);
-
-  // ゲストとしてポーリング開始
-  startJoinPolling();
-}
-
-async function pollForAnswer() {
-  const keyword = Elm.keyword.value;
-  let attempts = 0;
-  const maxAttempts = 300; // 10分間待機（300回×2秒=600秒）
-  const tokenResetThreshold = 5; // 10秒後にトークンなし通信を試行
-
-  const pollInterval = setInterval(async () => {
-    attempts++;
-    
-    // 10秒後にトークンをリセットして再送信
-    if (attempts === tokenResetThreshold && sessionManager.sessionToken) {
-      console.log('10秒経過、トークンなし通信に切り替え');
-      await resetToTokenlessMode(keyword);
-    }
-    
-    // セッションタイムアウトまたは接続完了でポーリング終了
-    const isSessionExpired = sessionManager.isSessionExpired();
-    if (attempts > maxAttempts || sessionManager.connectionEstablished || isSessionExpired) {
-      clearInterval(pollInterval);
-      if (!sessionManager.connectionEstablished) {
-        if (isSessionExpired) {
-          uiManager.updateStatus('セッション時間が終了しました');
-          cleanup();
-        } else {
-          uiManager.updateStatus('タイムアウト: 参加者が見つかりませんでした');
-          cleanup();
-        }
-      }
-      return;
-    }
-
+  // アンサー待ちループ
+  uiManager.updateStatus('応答を待っています...');
+  while (sessionManager.sessionActive && !sessionManager.connectionEstablished) {
+    console.log('アンサーを待機中:', keyword);
     try {
-      // 10回に1回、他のホストとの競合をチェック
-      if (attempts % 10 === 0) {
-        await checkForHostConflict(keyword, pollInterval);
-        if (!sessionManager.isHost) {
-          // ゲストに降格した場合、このポーリングを終了
-          return;
-        }
-      }
-
-      // トークンベースのパスと旧形式の両方をチェック
-      let answerPath;
-      if (sessionManager.sessionToken) {
-        answerPath = `${keyword}/${sessionManager.sessionToken}/answer`;
-      } else {
-        answerPath = `${keyword}-answer`;
-      }
-
-      const signal = await signalingManager.receiveSignal(answerPath);
+      const signal = await signalingManager.receive(`${keyword}/answer`, keyword, 600);
       if (signal && signal.type === 'answer') {
-        clearInterval(pollInterval);
-        uiManager.updateStatus('参加者からの応答を受信 - ICE候補を交換中...');
+        console.log('アンサー受信');
+        uiManager.updateStatus('応答を受信 - 接続中...');
         await webRTCManager.setRemoteDescription(signal.answer);
         pollForIceCandidates();
+        return;
       }
+      // タイムアウト → 再試行
+      console.log('アンサー待機タイムアウト、再試行...');
     } catch (error) {
-      // 応答待ち
-    }
-  }, 2000);
-
-  addPollingInterval(pollInterval);
-}
-
-// ホスト競合チェック関数
-async function checkForHostConflict(keyword, currentPollInterval) {
-  try {
-    console.log('ホスト競合チェック実行:', keyword);
-    
-    // 基本キーワードで他のオファーをチェック
-    const otherOffer = await signalingManager.receiveSignal(keyword);
-    
-    if (otherOffer && otherOffer.type === 'offer' && otherOffer.token !== sessionManager.sessionToken) {
-      console.log('他のホストを検出、ゲストに降格:', otherOffer.token);
-      
-      // 優先度で判定（セッショントークンの文字列比較）
-      const shouldDemote = sessionManager.sessionToken > otherOffer.token;
-      
-      if (shouldDemote) {
-        clearInterval(currentPollInterval);
-        uiManager.updateStatus('他のホストを検出、参加者として接続中...');
-        
-        // ゲストに降格
-        sessionManager.isHost = false;
-        sessionManager.sessionToken = otherOffer.token; // 相手のトークンを使用
-        
-        // 既存の接続をクリーンアップ
-        stopAllPolling();
-        webRTCManager.close();
-        
-        // ゲストとして接続開始
-        await webRTCManager.createPeerConnection();
-        webRTCManager.setupDataChannel();
-        await webRTCManager.setRemoteDescription(otherOffer.offer);
-        
-        const answer = await webRTCManager.createAnswer();
-        const answerPath = `${keyword}/${otherOffer.token}/answer`;
-        
-        await signalingManager.sendSignal(answerPath, {
-          type: 'answer',
-          answer: answer
-        });
-        
-        uiManager.updateStatus('ICE候補を交換中...');
-        pollForIceCandidates();
+      if (error.name === 'AbortError') {
+        console.log('アンサー待機キャンセル');
+        return;
       }
+      console.error('アンサー待機エラー:', error);
     }
-  } catch (error) {
-    // 競合チェックエラーは無視（通常の動作を継続）
-    console.log('ホスト競合チェックエラー（無視）:', error.message);
   }
 }
 
-// トークンなし通信モードにリセット
-async function resetToTokenlessMode(keyword) {
-  try {
-    console.log('トークンなし通信モードに切り替え:', keyword);
-    uiManager.updateStatus('通信方式を変更中...');
-    
-    // トークンをクリア
-    const oldToken = sessionManager.sessionToken;
-    sessionManager.sessionToken = null;
-    
-    // 新しいオファーを作成（トークンなし）
-    const offer = await webRTCManager.createOffer();
-    
-    // シンプルなキーワードでオファーを再送信
-    await signalingManager.sendSignal(keyword, {
-      type: 'offer',
-      offer: offer,
-      token: null
-    });
-    
-    console.log('トークンなしオファー送信完了');
-    uiManager.updateStatus('参加者を待っています（互換モード）...');
-    
-  } catch (error) {
-    console.error('トークンなし通信切り替えエラー:', error);
-    // エラー時は元のトークンを復元
-    sessionManager.sessionToken = oldToken;
-  }
-}
+// ゲストセッション
+async function guestSession(keyword) {
+  sessionManager.startSession(false, keyword);
 
-async function startJoinPolling() {
-  const keyword = sessionManager.currentKeyword;
-  let attempts = 0;
-  const maxAttempts = 30;
+  uiManager.updateStatus('オファーを取得中...');
+  startKeywordTimer();
 
-  uiManager.updateStatus('オファーを検索しています...');
-
-  const pollInterval = setInterval(async () => {
-    attempts++;
-    if (attempts > maxAttempts || sessionManager.connectionEstablished) {
-      clearInterval(pollInterval);
-      if (!sessionManager.connectionEstablished) {
-        console.log('オファー検索タイムアウト、ホストロールを試行');
-        uiManager.updateStatus('セッションが見つからないため、ホストとして待機中...');
-        
-        try {
-          // ホストロールを試行
-          sessionManager.isHost = true;
-          sessionManager.sessionToken = Utility.generateSessionToken();
-          
-          await webRTCManager.createPeerConnection();
-          webRTCManager.setupDataChannel();
-          const offer = await webRTCManager.createOffer();
-          
-          await signalingManager.sendSignal(keyword, {
-            type: 'offer',
-            offer: offer,
-            token: sessionManager.sessionToken
-          });
-          
-          uiManager.updateStatus('ホストとして参加者を待っています...');
-          startKeywordTimer();
-          pollForAnswer();
-          
-        } catch (error) {
-          console.error('ホストロール切り替えエラー:', error);
-          
-          if (error.status === 409) {
-            // 他の人が既にホストになった場合、再度ゲストとして試行
-            console.log('他の人がホストになったため、再度ゲストとして試行');
-            uiManager.updateStatus('他の参加者がホストになりました。再接続中...');
-            sessionManager.isHost = false;
-            
-            // 新しいポーリングを開始（リトライ回数リセット）
-            attempts = 0; 
-            uiManager.updateStatus('オファーを検索しています...');
-          } else {
-            uiManager.updateStatus('接続に失敗しました');
-            cleanup();
-          }
-        }
-      }
-      return;
-    }
-
+  // オファー受信ループ
+  let offer = null;
+  while (sessionManager.sessionActive && !sessionManager.connectionEstablished) {
+    console.log('オファーを待機中:', keyword);
     try {
-      // シンプルに基本キーワードのみを検索
-      console.log('オファーを検索中:', keyword);
-      const signal = await signalingManager.receiveSignal(keyword);
-
+      const signal = await signalingManager.receive(keyword, keyword, 600);
       if (signal && signal.type === 'offer') {
-        clearInterval(pollInterval);
-        uiManager.updateStatus('オファー受信 - 応答を準備中...');
-
-        // ホストからのトークンを保存（nullの場合もある）
-        if (signal.token) {
-          sessionManager.sessionToken = signal.token;
-          console.log('セッショントークン受信:', sessionManager.sessionToken);
-        } else {
-          sessionManager.sessionToken = null;
-          console.log('トークンなし通信モードで受信');
-        }
-
-        await webRTCManager.createPeerConnection();
-        webRTCManager.setupDataChannel();
-
-        await webRTCManager.setRemoteDescription(signal.offer);
-        uiManager.updateStatus('応答を作成中...');
-        const answer = await webRTCManager.createAnswer();
-
-        // トークンに応じてパスを決定
-        let answerPath;
-        if (sessionManager.sessionToken) {
-          answerPath = `${keyword}/${sessionManager.sessionToken}/answer`;
-        } else {
-          answerPath = `${keyword}-answer`;
-        }
-
-        uiManager.updateStatus('応答を送信中...');
-        await signalingManager.sendSignal(answerPath, {
-          type: 'answer',
-          answer: answer
-        });
-
-        uiManager.updateStatus('ICE候補を交換中...');
-        pollForIceCandidates();
+        console.log('オファー受信');
+        offer = signal.offer;
+        break;
       }
+      // タイムアウト → 再試行
+      console.log('オファー待機タイムアウト、再試行...');
     } catch (error) {
-      console.log('参加ポーリングエラー:', error.message);
+      if (error.name === 'AbortError') {
+        console.log('オファー待機キャンセル');
+        return;
+      }
+      console.error('オファー待機エラー:', error);
     }
-  }, 2000);
+  }
 
-  addPollingInterval(pollInterval);
+  if (!offer || !sessionManager.sessionActive) return;
+
+  // PeerConnection作成とアンサー生成
+  await webRTCManager.createPeerConnection();
+  webRTCManager.setupDataChannel();
+  await webRTCManager.setRemoteDescription(offer);
+
+  uiManager.updateStatus('応答を作成中...');
+  const answer = await webRTCManager.createAnswer();
+
+  // アンサー送信ループ
+  uiManager.updateStatus('応答を送信中...');
+  while (sessionManager.sessionActive && !sessionManager.connectionEstablished) {
+    console.log('アンサーを送信中:', keyword);
+    try {
+      const result = await signalingManager.send(`${keyword}/answer`, {
+        type: 'answer',
+        answer: answer
+      }, keyword, 600);
+
+      if (result.success) {
+        console.log('アンサーが受信された');
+        uiManager.updateStatus('接続中...');
+        pollForIceCandidates();
+        return;
+      }
+      // タイムアウト → 再送信
+      console.log('アンサー送信タイムアウト、再送信...');
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('アンサー送信キャンセル');
+        return;
+      }
+      console.error('アンサー送信エラー:', error);
+    }
+  }
 }
+
 
 async function pollForIceCandidates() {
   const keyword = sessionManager.currentKeyword || Elm.keyword.value;
-  const targetKey = sessionManager.sessionToken ?
-    `${keyword}/${sessionManager.sessionToken}/ice-${sessionManager.isHost ? 'guest' : 'host'}` :
-    `${keyword}-ice-${sessionManager.isHost ? 'guest' : 'host'}`;
+  const targetKey = `${keyword}/ice-${sessionManager.isHost ? 'guest' : 'host'}`;
   console.log('ICE候補ポーリング開始:', targetKey);
 
   let attempts = 0;
@@ -1854,7 +1515,7 @@ async function pollForIceCandidates() {
     }
 
     try {
-      const signal = await signalingManager.receiveSignal(targetKey);
+      const signal = await signalingManager.receive(targetKey, keyword, 5);
       if (signal && signal.type === 'ice-batch' && signal.isHost !== sessionManager.isHost) {
         console.log('ICE候補受信:', signal.candidates.length, '個');
         clearInterval(pollInterval);
@@ -1871,7 +1532,8 @@ async function pollForIceCandidates() {
 
         // ICE候補追加後、接続状態をチェック
         setTimeout(async () => {
-          const currentState = webRTCManager.getPeerConnection()?.connectionState;
+          const pc = webRTCManager.getPeerConnection();
+          const currentState = pc ? pc.connectionState : null;
           console.log('ICE候補追加後の接続状態:', currentState);
 
           if (currentState === 'connected') {
@@ -1965,48 +1627,24 @@ function clearReconnectInterval() {
 async function promoteGuestToHost() {
   try {
     console.log('ゲストを新ホストに昇格中...');
-    
+
     // 現在の接続をクリーンアップ（ローカルストリームは保持）
     stopAllPolling();
     webRTCManager.close();
-    
+
     // ホストとして再設定
     sessionManager.isHost = true;
     sessionManager.connectionEstablished = false;
-    sessionManager.sessionToken = Utility.generateSessionToken(); // 新しいトークン生成
-    
-    // 新しいWebRTC接続を作成
-    await webRTCManager.createPeerConnection();
-    webRTCManager.setupDataChannel();
-    
-    // オファーを作成して送信
-    const offer = await webRTCManager.createOffer();
+
     const keyword = sessionManager.currentKeyword;
-    
-    console.log('新ホストとしてオファー送信:', keyword);
-    await signalingManager.sendSignal(keyword, {
-      type: 'offer',
-      offer: offer,
-      token: sessionManager.sessionToken
-    });
-    
-    uiManager.updateStatus('新ホストとして参加者を待っています...');
-    startKeywordTimer();
-    pollForAnswer();
-    
+
+    // 新ホストセッションを開始
+    await hostSession(keyword);
+
   } catch (error) {
     console.error('ホスト昇格エラー:', error);
-    
-    if (error.status === 409) {
-      // 他の人が既にホストになった場合、ゲストとして再試行
-      console.log('他の人が新ホストになったため、ゲストとして参加試行');
-      uiManager.updateStatus('他の参加者がホストになりました。参加者として接続中...');
-      sessionManager.isHost = false; // ゲストに戻す
-      startJoinPolling();
-    } else {
-      uiManager.updateStatus('ホスト昇格に失敗しました');
-      cleanup();
-    }
+    uiManager.updateStatus('ホスト昇格に失敗しました');
+    cleanup();
   }
 }
 
@@ -2025,7 +1663,7 @@ function cleanup() {
   stopAllPolling(); // 全ポーリング停止
 
   // 進行中のpiping serverへの接続をキャンセル
-  signalingManager.abortCurrentRequest();
+  signalingManager.abort();
 
   // ASCII変換を停止
   asciiConverter.stopConversion();
@@ -2400,7 +2038,7 @@ if (window.visualViewport) {
 function performCleanup() {
   console.log('クリーンアップ実行');
   stopAllPolling();
-  signalingManager.abortCurrentRequest();
+  signalingManager.abort();
   if (mediaManager.getLocalStream()) {
     mediaManager.stopCamera();
   }
