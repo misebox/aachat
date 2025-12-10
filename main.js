@@ -72,22 +72,37 @@ class Utility {
     return baseKeyword + randomSuffix;
   }
 
-  // XOR暗号化用の関数
+  // XOR暗号化用の関数（UTF-8対応）
   static xorEncrypt(text, key) {
-    const encrypted = [];
-    for (let i = 0; i < text.length; i++) {
-      encrypted.push(String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    const encoder = new TextEncoder();
+    const textBytes = encoder.encode(text);
+    const keyBytes = encoder.encode(key);
+    const encrypted = new Uint8Array(textBytes.length);
+    for (let i = 0; i < textBytes.length; i++) {
+      encrypted[i] = textBytes[i] ^ keyBytes[i % keyBytes.length];
     }
-    return btoa(encrypted.join(''));
+    // Uint8Array を Base64 に変換
+    let binary = '';
+    for (let i = 0; i < encrypted.length; i++) {
+      binary += String.fromCharCode(encrypted[i]);
+    }
+    return btoa(binary);
   }
 
   static xorDecrypt(encryptedBase64, key) {
-    const encrypted = atob(encryptedBase64);
-    const decrypted = [];
-    for (let i = 0; i < encrypted.length; i++) {
-      decrypted.push(String.fromCharCode(encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    const binary = atob(encryptedBase64);
+    const encrypted = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      encrypted[i] = binary.charCodeAt(i);
     }
-    return decrypted.join('');
+    const encoder = new TextEncoder();
+    const keyBytes = encoder.encode(key);
+    const decrypted = new Uint8Array(encrypted.length);
+    for (let i = 0; i < encrypted.length; i++) {
+      decrypted[i] = encrypted[i] ^ keyBytes[i % keyBytes.length];
+    }
+    const decoder = new TextDecoder();
+    return decoder.decode(decrypted);
   }
 }
 
