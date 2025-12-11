@@ -1,3 +1,6 @@
+// App info
+export const APP_TITLE = 'AACHAT';
+
 // Piping Server URL
 export const PPNG_SERVER = atob('aHR0cHM6Ly9wcG5nLnVydGVsbC5jb20vcA==');
 

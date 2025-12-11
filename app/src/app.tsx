@@ -13,6 +13,7 @@ import {
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnection, useUI } from '@/hooks';
+import { APP_TITLE } from '@/lib/constants';
 
 export default function App() {
   let localVideoRef: HTMLVideoElement | undefined;
@@ -40,6 +41,8 @@ export default function App() {
 
   // Initialize canvas, setup UI, and load URL parameters
   onMount(async () => {
+    document.title = APP_TITLE;
+
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
