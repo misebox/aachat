@@ -196,6 +196,29 @@ export function useWebRTC(callbacks: WebRTCCallbacks = {}) {
   }
 
   /**
+   * Get connection type from ICE candidate (host, srflx, prflx, relay)
+   */
+  async function getConnectionType(): Promise<string | null> {
+    const pc = peerConnection();
+    if (!pc) return null;
+
+    try {
+      const stats = await pc.getStats();
+      for (const report of stats.values()) {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+          const localCandidate = stats.get(report.localCandidateId);
+          if (localCandidate) {
+            return localCandidate.candidateType;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  /**
    * Close connection and cleanup
    */
   function close(): void {
@@ -234,6 +257,7 @@ export function useWebRTC(callbacks: WebRTCCallbacks = {}) {
     setRemoteDescription,
     addIceCandidate,
     addIceCandidates,
+    getConnectionType,
     close,
   };
 }
