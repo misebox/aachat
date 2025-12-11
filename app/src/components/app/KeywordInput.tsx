@@ -22,7 +22,7 @@ export const KeywordInput: Component<KeywordInputProps> = (props) => {
       placeholder={props.placeholder ?? 'keyword'}
       readonly={props.readonly}
       disabled={props.disabled}
-      class="px-3 py-2 bg-transparent border border-gray-600 text-white font-mono text-base flex-1 min-w-0 max-w-[200px] md:max-w-none md:w-auto focus:outline-none focus:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-3 py-2 bg-transparent border border-gray-600 text-white font-mono text-base flex-1 min-w-0 max-w-[30ch] focus:outline-none focus:border-white disabled:opacity-50 disabled:cursor-not-allowed"
     />
   );
 };
