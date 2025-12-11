@@ -11,7 +11,7 @@ import { DeviceSelector } from './DeviceSelector';
 import { appStore } from '@/store/app';
 
 interface DeviceDialogProps {
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   onApply: (videoDeviceId: string, audioDeviceId: string) => void;
 }
 
@@ -22,9 +22,30 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
   // When dialog opens, refresh devices and sync current selection
   createEffect(() => {
     if (appStore.deviceDialogOpen()) {
-      props.onRefresh();
+      // Sync current selection first
       setTempVideoDevice(appStore.selectedVideoDevice());
       setTempAudioDevice(appStore.selectedAudioDevice());
+      // Then refresh device list
+      props.onRefresh();
+    }
+  });
+
+  // Sync when selected device changes (e.g., after camera starts)
+  createEffect(() => {
+    if (appStore.deviceDialogOpen()) {
+      const videoId = appStore.selectedVideoDevice();
+      if (videoId && !tempVideoDevice()) {
+        setTempVideoDevice(videoId);
+      }
+    }
+  });
+
+  createEffect(() => {
+    if (appStore.deviceDialogOpen()) {
+      const audioId = appStore.selectedAudioDevice();
+      if (audioId && !tempAudioDevice()) {
+        setTempAudioDevice(audioId);
+      }
     }
   });
 
