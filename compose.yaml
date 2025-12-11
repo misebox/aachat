@@ -6,14 +6,16 @@ services:
       target: development
     ports:
       - "9020:4173"
-    volumes:
-      - ./app:/app
-      - /app/node_modules
+    # volumes:
+    #   - ./app:/app
+    #   - /app/node_modules
     develop:
       watch:
         - action: sync+restart
           path: ./app/src
           target: /app/src
+          ignore:
+            - node_modules/
     environment:
       NODE_ENV: development
       VITE_API_URL: 'http://localhost:5173'
