@@ -108,7 +108,10 @@ export default function App() {
   });
 
   const handleConnect = async () => {
+    console.log('handleConnect called');
     const keyword = appStore.keyword();
+    console.log('keyword:', keyword);
+
     if (!keyword.trim()) {
       appStore.setStatusText('Please enter a keyword');
       return;
@@ -117,8 +120,16 @@ export default function App() {
     appStore.setConnectionState('connecting');
     appStore.setStatusText('Connecting...');
 
-    const success = await connection.connect(keyword);
-    if (!success && appStore.connectionState() !== 'connected') {
+    try {
+      console.log('Calling connection.connect...');
+      const success = await connection.connect(keyword);
+      console.log('connection.connect returned:', success);
+      if (!success && appStore.connectionState() !== 'connected') {
+        appStore.setConnectionState('idle');
+      }
+    } catch (error) {
+      console.error('handleConnect error:', error);
+      appStore.setStatusText('Connection failed');
       appStore.setConnectionState('idle');
     }
   };
