@@ -7,6 +7,7 @@ import { ASCII_CHARS, CHAR_COUNT, AA_WIDTH, AA_HEIGHT } from '@/lib/constants';
 export function useAscii() {
   const [localAscii, setLocalAscii] = createSignal('');
   const [remoteAscii, setRemoteAscii] = createSignal('');
+  const [dynamicRangeEnabled, setDynamicRangeEnabled] = createSignal(true);
 
   let canvas: HTMLCanvasElement | null = null;
   let ctx: CanvasRenderingContext2D | null = null;
@@ -52,8 +53,8 @@ export function useAscii() {
         const i = (y * AA_WIDTH + x) * 4;
         let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
 
-        // Apply dynamic range normalization
-        if (maxBrightness > minBrightness) {
+        // Apply dynamic range normalization if enabled
+        if (dynamicRangeEnabled() && maxBrightness > minBrightness) {
           brightness = (brightness - minBrightness) / (maxBrightness - minBrightness);
           brightness = Math.max(0, Math.min(1, brightness));
           const charIndex = Math.floor(brightness * (CHAR_COUNT - 1));
@@ -192,6 +193,8 @@ export function useAscii() {
     remoteAscii,
     setLocalAscii,
     setRemoteAscii,
+    dynamicRangeEnabled,
+    setDynamicRangeEnabled,
     initCanvas,
     videoToAscii,
     startConversion,
