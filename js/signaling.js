@@ -1,8 +1,21 @@
+import { Config } from './constants.js';
+
 // SignalingManager - piping server を使ったシグナリング
-class SignalingManager {
+export class SignalingManager {
   constructor(baseUrl) {
     this.baseUrl = baseUrl;
-    this.abortController = null;
+    this.activeControllers = new Set();
+    this.cancelKey = null; // セッション固有のキャンセルキー
+  }
+
+  // セッションのキャンセルキーを設定
+  setCancelKey(key) {
+    this.cancelKey = key;
+  }
+
+  // キャンセルキーをクリア
+  clearCancelKey() {
+    this.cancelKey = null;
   }
 
   // XOR暗号化 (UTF-8対応)
@@ -51,76 +64,131 @@ class SignalingManager {
     }
   }
 
-  // 送信 (PUT) - 受信者が来るまで待つ
-  async send(path, data, key, timeout = 600) {
-    this.abortController = new AbortController();
+  // 送信 (PUT) - 独立したAbortControllerを使用
+  async send(path, data, key, timeout = Config.TIMEOUT_SIGNALING) {
+    const controller = new AbortController();
+    this.activeControllers.add(controller);
 
     const json = JSON.stringify(data);
     const body = this._encrypt(json, key);
 
-    console.log('[SignalingManager] PUT 開始:', path);
-    const response = await fetch(`${this.baseUrl}/${path}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'text/plain',
-        'X-Timeout': String(timeout)
-      },
-      body: body,
-      signal: this.abortController.signal
-    });
+    const headers = {
+      'Content-Type': 'text/plain',
+      'X-Timeout': String(timeout)
+    };
+    if (this.cancelKey) {
+      headers['X-Cancel-Key'] = this.cancelKey;
+    }
 
-    if (!response.ok) {
-      console.error('[SignalingManager] PUT エラー:', path, response.status);
-      const error = new Error(`send failed: ${response.status}`);
-      error.status = response.status;
+    console.log('[SignalingManager] PUT 開始:', path);
+    try {
+      const response = await fetch(`${this.baseUrl}/${path}`, {
+        method: 'PUT',
+        headers,
+        body: body,
+        signal: controller.signal
+      });
+
+      this.activeControllers.delete(controller);
+
+      if (!response.ok) {
+        console.error('[SignalingManager] PUT エラー:', path, response.status);
+        const error = new Error(`send failed: ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+
+      const text = await response.text();
+      const success = text.includes('[OK]');
+      const timedOut = text.includes('[TIMEOUT]');
+      if (success) {
+        console.log('[SignalingManager] PUT 成功:', path);
+      } else if (timedOut) {
+        console.log('[SignalingManager] PUT タイムアウト:', path);
+      } else {
+        console.log('[SignalingManager] PUT 応答:', path, text);
+      }
+      return { success, timedOut };
+    } catch (error) {
+      this.activeControllers.delete(controller);
       throw error;
     }
-
-    const text = await response.text();
-    const timedOut = text.includes('Timeout');
-    console.log('[SignalingManager] PUT 完了:', path, 'タイムアウト:', timedOut, 'レスポンス:', text.substring(0, 100));
-    return { success: !timedOut, timedOut };
   }
 
-  // 受信 (GET) - 送信者が来るまで待つ
-  async receive(path, key, timeout = 600) {
-    this.abortController = new AbortController();
+  // 受信 (GET) - 独立したAbortControllerを使用
+  async receive(path, key, timeout = Config.TIMEOUT_SIGNALING) {
+    const controller = new AbortController();
+    this.activeControllers.add(controller);
+
+    const headers = {
+      'X-Timeout': String(timeout)
+    };
+    if (this.cancelKey) {
+      headers['X-Cancel-Key'] = this.cancelKey;
+    }
 
     console.log('[SignalingManager] GET 開始:', path);
-    const response = await fetch(`${this.baseUrl}/${path}`, {
-      method: 'GET',
-      headers: {
-        'X-Timeout': String(timeout)
-      },
-      signal: this.abortController.signal
-    });
-
-    if (!response.ok) {
-      console.log('[SignalingManager] GET エラー:', path, response.status);
-      return null;
-    }
-
-    const text = await response.text();
-    console.log('[SignalingManager] GET 完了:', path, 'レスポンス長:', text.length);
-    if (text.includes('Timeout')) {
-      console.log('[SignalingManager] GET タイムアウト:', path);
-      return null;
-    }
-
     try {
-      const decrypted = this._decrypt(text, key);
-      return JSON.parse(decrypted);
-    } catch (e) {
-      console.error('[SignalingManager] parse error:', path, e);
-      return null;
+      const response = await fetch(`${this.baseUrl}/${path}`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal
+      });
+
+      this.activeControllers.delete(controller);
+
+      if (!response.ok) {
+        console.log('[SignalingManager] GET エラー:', path, response.status);
+        return null;
+      }
+
+      const text = await response.text();
+      console.log('[SignalingManager] GET 完了:', path, 'レスポンス長:', text.length);
+
+      // 空レスポンスまたはタイムアウト
+      if (!text || text.length === 0 || text.includes('[TIMEOUT]')) {
+        console.log('[SignalingManager] GET 空/タイムアウト:', path);
+        return null;
+      }
+
+      try {
+        const decrypted = this._decrypt(text, key);
+        return JSON.parse(decrypted);
+      } catch (e) {
+        console.error('[SignalingManager] parse error:', path, e);
+        return null;
+      }
+    } catch (error) {
+      this.activeControllers.delete(controller);
+      if (error.name === 'AbortError') {
+        console.log('[SignalingManager] GET キャンセル:', path);
+        return null;
+      }
+      throw error;
     }
   }
 
-  // キャンセル
+  // ローカルのリクエストをキャンセル
   abort() {
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
+    for (const controller of this.activeControllers) {
+      controller.abort();
+    }
+    this.activeControllers.clear();
+  }
+
+  // サーバー上の待機中リクエストをキャンセル（X-Cancel-Key で登録されたもの）
+  async cancelOnServer(path) {
+    if (!this.cancelKey) return;
+    try {
+      await fetch(`${this.baseUrl}/${path}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Cancel-Key': this.cancelKey
+        }
+      });
+      console.log('[SignalingManager] DELETE Piping Channel:', path);
+    } catch (error) {
+      // ignore
     }
   }
 }
