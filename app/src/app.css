@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  /* AA Display font sizes */
+  --aa-font-size: 10px;
+  --remote-aa-font-size: 10px;
+}
+
+/* Mobile font sizes */
+@media (max-width: 768px) {
+  :root {
+    --aa-font-size: 4px;
+    --remote-aa-font-size: 8px;
+  }
+}
+
+/* Tablet portrait */
+@media (min-width: 769px) and (max-width: 1200px) and (orientation: portrait) {
+  :root {
+    --aa-font-size: 6px;
+    --remote-aa-font-size: 6px;
+  }
+}
+
+/* Tablet landscape */
+@media (min-width: 769px) and (max-width: 1200px) and (orientation: landscape) {
+  :root {
+    --aa-font-size: 8px;
+    --remote-aa-font-size: 8px;
+  }
+}
+
+body {
+  background: black;
+  color: white;
+  font-family: "Courier New", monospace;
+  margin: 0;
+  padding: 0;
+}
+
+/* AA Display base styles */
+.aa-display {
+  font-family: "Courier New", monospace;
+}
+
+/* Clickable elements */
+button,
+[role="button"],
+a,
+select {
+  cursor: pointer;
+}
