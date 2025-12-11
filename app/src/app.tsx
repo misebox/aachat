@@ -1,4 +1,4 @@
-import { Suspense } from 'solid-js';
+import { Suspense, onMount, onCleanup, createEffect } from 'solid-js';
 import { HelpCircle } from 'lucide-solid';
 
 import './app.css';
@@ -12,35 +12,141 @@ import {
   IconButton,
 } from '@/components/app';
 import { appStore } from '@/store/app';
+import { useConnection } from '@/hooks';
 
 export default function App() {
   let localVideoRef: HTMLVideoElement | undefined;
   let remoteVideoRef: HTMLVideoElement | undefined;
+  let canvasRef: HTMLCanvasElement | undefined;
 
-  const handleConnect = () => {
-    // TODO: Implement connection logic
-    console.log('Connect clicked');
-    appStore.setStatusText('Connecting...');
+  const connection = useConnection({
+    onStatusChange: (status) => {
+      appStore.setStatusText(status);
+    },
+    onConnected: () => {
+      appStore.setConnectionState('connected');
+      // Start ASCII conversion when connected
+      if (localVideoRef && remoteVideoRef) {
+        connection.ascii.startConversion(localVideoRef, remoteVideoRef);
+      }
+    },
+    onDisconnected: () => {
+      appStore.setConnectionState('disconnected');
+    },
+    onError: (error) => {
+      console.error('Connection error:', error);
+      appStore.setStatusText(error);
+      appStore.setConnectionState('error');
+    },
+  });
+
+  // Initialize canvas for ASCII conversion
+  onMount(() => {
+    if (canvasRef) {
+      connection.ascii.initCanvas(canvasRef);
+    }
+  });
+
+  // Sync local stream to video element
+  createEffect(() => {
+    const stream = connection.media.localStream();
+    if (localVideoRef && stream) {
+      localVideoRef.srcObject = stream;
+      localVideoRef.play().catch(() => {});
+    }
+  });
+
+  // Sync remote stream to video element
+  createEffect(() => {
+    const stream = connection.remoteStream();
+    if (remoteVideoRef && stream) {
+      remoteVideoRef.srcObject = stream;
+      remoteVideoRef.play().catch(() => {});
+    }
+  });
+
+  // Sync ASCII output to store
+  createEffect(() => {
+    appStore.setLocalAscii(connection.ascii.localAscii());
+  });
+
+  createEffect(() => {
+    appStore.setRemoteAscii(connection.ascii.remoteAscii());
+  });
+
+  // Sync devices to store
+  createEffect(() => {
+    appStore.setVideoDevices(connection.media.videoDevices());
+  });
+
+  createEffect(() => {
+    appStore.setAudioDevices(connection.media.audioDevices());
+  });
+
+  // Timer for elapsed time
+  let timerInterval: number | undefined;
+
+  createEffect(() => {
+    if (connection.session.connectionEstablished()) {
+      timerInterval = window.setInterval(() => {
+        appStore.setElapsedTime(connection.session.getSessionDuration());
+      }, 1000);
+    } else {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = undefined;
+      }
+      appStore.setElapsedTime(0);
+    }
+  });
+
+  onCleanup(() => {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+    }
+    connection.cleanup();
+  });
+
+  const handleConnect = async () => {
+    const keyword = appStore.keyword();
+    if (!keyword.trim()) {
+      appStore.setStatusText('Please enter a keyword');
+      return;
+    }
+
     appStore.setConnectionState('connecting');
+    appStore.setStatusText('Connecting...');
+
+    const success = await connection.connect(keyword);
+    if (!success && appStore.connectionState() !== 'connected') {
+      appStore.setConnectionState('idle');
+    }
   };
 
   const handleLeave = () => {
-    // TODO: Implement leave logic
-    console.log('Leave clicked');
-    appStore.setStatusText('');
+    connection.disconnect();
     appStore.setConnectionState('idle');
+    appStore.setStatusText('');
+    appStore.setLocalAscii('');
+    appStore.setRemoteAscii('');
   };
 
-  const handleRefreshDevices = () => {
-    // TODO: Implement device refresh
-    console.log('Refresh devices');
+  const handleRefreshDevices = async () => {
+    await connection.media.getAvailableDevices();
   };
 
-  const handleApplyDevices = (videoDeviceId: string, audioDeviceId: string) => {
-    // TODO: Implement device change
-    console.log('Apply devices', videoDeviceId, audioDeviceId);
-    appStore.setSelectedVideoDevice(videoDeviceId);
-    appStore.setSelectedAudioDevice(audioDeviceId);
+  const handleApplyDevices = async (videoDeviceId: string, audioDeviceId: string) => {
+    const pc = connection.webrtc.peerConnection();
+
+    if (videoDeviceId !== connection.media.selectedVideoId()) {
+      await connection.media.switchDevice('video', videoDeviceId, pc || undefined);
+      appStore.setSelectedVideoDevice(videoDeviceId);
+    }
+
+    if (audioDeviceId !== connection.media.selectedAudioId()) {
+      await connection.media.switchDevice('audio', audioDeviceId, pc || undefined);
+      appStore.setSelectedAudioDevice(audioDeviceId);
+    }
   };
 
   return (
@@ -64,7 +170,7 @@ export default function App() {
         </div>
 
         {/* Hidden canvas for video processing */}
-        <canvas id="canvas" class="hidden" />
+        <canvas ref={(el) => (canvasRef = el)} class="hidden" />
 
         {/* Dialogs */}
         <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
