@@ -9,6 +9,11 @@ services:
     volumes:
       - ./app:/app
       - /app/node_modules
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./app/src
+          target: /app/src
     environment:
       NODE_ENV: development
       VITE_API_URL: 'http://localhost:5173'
