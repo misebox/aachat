@@ -24,6 +24,10 @@ const [remoteAscii, setRemoteAscii] = createSignal('');
 const [deviceDialogOpen, setDeviceDialogOpen] = createSignal(false);
 const [helpDialogOpen, setHelpDialogOpen] = createSignal(false);
 
+// Keyword state
+const [isKeywordFromURL, setIsKeywordFromURL] = createSignal(false);
+const [keywordLocked, setKeywordLocked] = createSignal(false);
+
 // Computed: is connected
 const isConnected = () => connectionState() === 'connected';
 const isConnecting = () => connectionState() === 'connecting';
@@ -65,6 +69,12 @@ export const appStore = {
   setDeviceDialogOpen,
   helpDialogOpen,
   setHelpDialogOpen,
+
+  // Keyword state
+  isKeywordFromURL,
+  setIsKeywordFromURL,
+  keywordLocked,
+  setKeywordLocked,
 
   // Computed
   isConnected,

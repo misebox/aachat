@@ -11,11 +11,15 @@ interface ConnectionControlsProps {
 }
 
 export const ConnectionControls: Component<ConnectionControlsProps> = (props) => {
+  const isKeywordLocked = () =>
+    appStore.isKeywordFromURL() || appStore.isConnecting() || appStore.isConnected();
+
   return (
-    <div class="flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
+    <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
       <KeywordInput
         value={appStore.keyword()}
         onInput={appStore.setKeyword}
+        readonly={isKeywordLocked()}
       />
 
       <Show when={appStore.keyword().length > 0 && appStore.isIdle()}>

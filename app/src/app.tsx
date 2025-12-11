@@ -12,12 +12,14 @@ import {
   IconButton,
 } from '@/components/app';
 import { appStore } from '@/store/app';
-import { useConnection } from '@/hooks';
+import { useConnection, useUI } from '@/hooks';
 
 export default function App() {
   let localVideoRef: HTMLVideoElement | undefined;
   let remoteVideoRef: HTMLVideoElement | undefined;
   let canvasRef: HTMLCanvasElement | undefined;
+
+  const ui = useUI();
 
   const connection = useConnection({
     onStatusChange: (status) => {
@@ -40,11 +42,12 @@ export default function App() {
     },
   });
 
-  // Initialize canvas for ASCII conversion
+  // Initialize canvas and setup UI
   onMount(() => {
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
+    ui.setupResizeListeners();
   });
 
   // Sync local stream to video element
