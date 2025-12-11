@@ -2,7 +2,7 @@
   "name": "aachat",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite build && bun serve.ts",
     "build": "vite build"
   },
   "dependencies": {
