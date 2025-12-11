@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "9020:5173"
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: 'http://localhost:5173'
+
+
