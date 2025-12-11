@@ -94,6 +94,17 @@ export default function App() {
     appStore.setAudioDevices(connection.media.audioDevices());
   });
 
+  // Sync selected device IDs to store
+  createEffect(() => {
+    const videoId = connection.media.selectedVideoId();
+    if (videoId) appStore.setSelectedVideoDevice(videoId);
+  });
+
+  createEffect(() => {
+    const audioId = connection.media.selectedAudioId();
+    if (audioId) appStore.setSelectedAudioDevice(audioId);
+  });
+
   // Timer for elapsed time
   let timerInterval: number | undefined;
 
