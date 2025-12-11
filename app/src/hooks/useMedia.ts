@@ -21,22 +21,40 @@ export function useMedia() {
   });
 
   /**
-   * Enumerate available media devices
+   * Enumerate available media devices (requests permission if needed)
    */
   async function getAvailableDevices(): Promise<void> {
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
+      // First check if we have permission by enumerating
+      let devices = await navigator.mediaDevices.enumerateDevices();
+
+      // If deviceId is empty, we need to request permission
+      const hasPermission = devices.some((d) => d.deviceId !== '');
+
+      if (!hasPermission) {
+        // Request permission with temporary stream
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // Stop tracks immediately - we just needed permission
+        tempStream.getTracks().forEach((track) => track.stop());
+        // Re-enumerate with permission
+        devices = await navigator.mediaDevices.enumerateDevices();
+      }
+
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      const audioInputs = devices.filter((d) => d.kind === 'audioinput');
 
       setVideoDevices(
-        devices
-          .filter((d) => d.kind === 'videoinput')
-          .map((d) => ({ deviceId: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0, 4)}` }))
+        videoInputs.map((d, i) => ({
+          deviceId: d.deviceId || `__video_${i}__`,
+          label: d.label || `Camera ${i + 1}`,
+        }))
       );
 
       setAudioDevices(
-        devices
-          .filter((d) => d.kind === 'audioinput')
-          .map((d) => ({ deviceId: d.deviceId, label: d.label || `Mic ${d.deviceId.slice(0, 4)}` }))
+        audioInputs.map((d, i) => ({
+          deviceId: d.deviceId || `__audio_${i}__`,
+          label: d.label || `Mic ${i + 1}`,
+        }))
       );
     } catch (error) {
       console.error('Device enumeration error:', error);
