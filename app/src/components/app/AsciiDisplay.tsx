@@ -1,4 +1,5 @@
 import { Component } from 'solid-js';
+import { AA_WIDTH, AA_HEIGHT } from '@/lib/constants';
 
 interface AsciiDisplayProps {
   content: string;
@@ -9,7 +10,6 @@ export const AsciiDisplay: Component<AsciiDisplayProps> = (props) => {
   const variant = () => props.variant ?? 'local';
 
   // Use CSS custom properties for font sizing
-  // Desktop: 10px, Mobile remote: 8px, Mobile local: 4px
   const fontSizeVar = () =>
     variant() === 'remote' ? 'var(--remote-aa-font-size, 8px)' : 'var(--aa-font-size, 10px)';
 
@@ -19,8 +19,8 @@ export const AsciiDisplay: Component<AsciiDisplayProps> = (props) => {
       style={{
         'font-size': fontSizeVar(),
         'letter-spacing': `calc(${fontSizeVar()} * 0.4)`,
-        width: `calc(80 * ${fontSizeVar()} * 0.6 + 79 * ${fontSizeVar()} * 0.4)`,
-        height: `calc(60 * ${fontSizeVar()})`,
+        width: `calc(${AA_WIDTH} * ${fontSizeVar()} * 0.6 + ${AA_WIDTH - 1} * ${fontSizeVar()} * 0.4)`,
+        height: `calc(${AA_HEIGHT} * ${fontSizeVar()})`,
         'max-width': '100%',
         'max-height': '100%',
       }}

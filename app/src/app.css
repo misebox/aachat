@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
 :root {
+  /* AA Display settings - sync with lib/constants.ts */
+  --aa-height: 30;
   /* AA Display font sizes */
   --aa-font-size: 10px;
   --remote-aa-font-size: 10px;
 }
 
-/* Mobile font sizes */
+/* Mobile font sizes
+   Available height = 100vh - 120px
+   StatusBar = 36px + margin
+*/
 @media (max-width: 768px) {
   :root {
-    --aa-font-size: 4px;
-    --remote-aa-font-size: 8px;
+    --aa-font-size: calc((100vh - 120px) / (var(--aa-height) * 3));
+    --remote-aa-font-size: calc((100vh - 120px) / (var(--aa-height) * 1.5));
   }
 }
 

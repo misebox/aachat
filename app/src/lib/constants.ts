@@ -11,8 +11,8 @@ export const STUN_SERVERS: RTCIceServer[] = JSON.parse(
 // ASCII Art settings
 export const ASCII_CHARS = ' .,:;ico%k0S@QNW';
 export const CHAR_COUNT = ASCII_CHARS.length;
-export const AA_WIDTH = 80;
-export const AA_HEIGHT = 60;
+export const AA_WIDTH = 40;
+export const AA_HEIGHT = 30;
 
 // Signaling timeouts (seconds)
 export const TIMEOUT_OFFER_PUT = 60; // H:OFFER_PUT - waiting for guest
