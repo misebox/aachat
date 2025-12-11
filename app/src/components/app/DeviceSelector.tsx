@@ -1,4 +1,4 @@
-import { Component } from 'solid-js';
+import { Component, createMemo } from 'solid-js';
 import {
   Select,
   SelectContent,
@@ -13,31 +13,46 @@ interface DeviceSelectorProps {
   value: string;
   onChange: (value: string) => void;
   devices: MediaDevice[];
-  placeholder?: string;
 }
 
 export const DeviceSelector: Component<DeviceSelectorProps> = (props) => {
+  // Reactive map of deviceId -> label
+  const deviceLabels = createMemo(() => {
+    const map = new Map<string, string>();
+    props.devices.forEach((d, i) => {
+      map.set(d.deviceId, d.label || `${props.label} ${i + 1}`);
+    });
+    return map;
+  });
+
+  const options = createMemo(() => props.devices.map((d) => d.deviceId));
+
+  // Reactive current label
+  const currentLabel = createMemo(() => {
+    const labels = deviceLabels();
+    return labels.get(props.value) ?? props.label;
+  });
+
   return (
     <div class="space-y-2">
       <label class="text-sm text-white">{props.label}</label>
       <Select
         value={props.value}
-        onChange={props.onChange}
-        options={props.devices.map((d) => d.deviceId)}
-        placeholder={props.placeholder ?? `Select ${props.label.toLowerCase()}`}
+        onChange={value => props.onChange(value ?? '')}
+        options={options()}
         itemComponent={(itemProps) => (
           <SelectItem item={itemProps.item}>
-            {props.devices.find((d) => d.deviceId === itemProps.item.rawValue)?.label ||
-              itemProps.item.rawValue}
+            {deviceLabels().get(itemProps.item.rawValue) ?? itemProps.item.rawValue}
           </SelectItem>
         )}
       >
         <SelectTrigger class="bg-transparent border-gray-600 text-white">
           <SelectValue<string>>
-            {(state) =>
-              props.devices.find((d) => d.deviceId === state.selectedOption())?.label ||
-              state.selectedOption()
-            }
+            {(state) => {
+              const selected = state.selectedOption();
+              if (selected == null) return currentLabel();
+              return deviceLabels().get(selected) ?? currentLabel();
+            }}
           </SelectValue>
         </SelectTrigger>
         <SelectContent class="bg-neutral-800 border-gray-600" />

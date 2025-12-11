@@ -30,22 +30,32 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
     }
   });
 
-  // Sync when selected device changes (e.g., after camera starts)
+  // Sync when selected device or device list changes
   createEffect(() => {
-    if (appStore.deviceDialogOpen()) {
-      const videoId = appStore.selectedVideoDevice();
-      if (videoId && !tempVideoDevice()) {
-        setTempVideoDevice(videoId);
-      }
+    if (!appStore.deviceDialogOpen()) return;
+
+    const videoId = appStore.selectedVideoDevice();
+    const videoDevices = appStore.videoDevices();
+
+    if (videoId) {
+      setTempVideoDevice(videoId);
+    } else if (videoDevices.length > 0 && !tempVideoDevice()) {
+      // Default to first device if no selection
+      setTempVideoDevice(videoDevices[0].deviceId);
     }
   });
 
   createEffect(() => {
-    if (appStore.deviceDialogOpen()) {
-      const audioId = appStore.selectedAudioDevice();
-      if (audioId && !tempAudioDevice()) {
-        setTempAudioDevice(audioId);
-      }
+    if (!appStore.deviceDialogOpen()) return;
+
+    const audioId = appStore.selectedAudioDevice();
+    const audioDevices = appStore.audioDevices();
+
+    if (audioId) {
+      setTempAudioDevice(audioId);
+    } else if (audioDevices.length > 0 && !tempAudioDevice()) {
+      // Default to first device if no selection
+      setTempAudioDevice(audioDevices[0].deviceId);
     }
   });
 
