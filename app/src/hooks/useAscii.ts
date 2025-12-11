@@ -143,7 +143,7 @@ export function useAscii() {
   /**
    * Start continuous conversion
    */
-  function startConversion(localVideo: HTMLVideoElement, remoteVideo: HTMLVideoElement): void {
+  function startConversion(localVideo: HTMLVideoElement, remoteVideo?: HTMLVideoElement): void {
     stopConversion();
 
     // Contrast analysis every second
@@ -159,9 +159,9 @@ export function useAscii() {
         setLocalAscii(videoToAscii(localVideo));
       }
 
-      if (remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
+      if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
         setRemoteAscii(videoToAscii(remoteVideo));
-      } else if (remoteVideo.srcObject && remoteVideo.videoWidth === 0) {
+      } else if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth === 0) {
         const now = Date.now();
         if (now - lastRemoteVideoLogTime > 5000) {
           console.log('Remote video has stream but no dimensions:', {

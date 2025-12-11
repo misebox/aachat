@@ -27,10 +27,6 @@ export default function App() {
     },
     onConnected: () => {
       appStore.setConnectionState('connected');
-      // Start ASCII conversion when connected
-      if (localVideoRef && remoteVideoRef) {
-        connection.ascii.startConversion(localVideoRef, remoteVideoRef);
-      }
     },
     onDisconnected: () => {
       appStore.setConnectionState('disconnected');
@@ -61,12 +57,14 @@ export default function App() {
     await connection.media.startCamera();
   });
 
-  // Sync local stream to video element
+  // Sync local stream to video element and start ASCII conversion
   createEffect(() => {
     const stream = connection.media.localStream();
     if (localVideoRef && stream) {
       localVideoRef.srcObject = stream;
       localVideoRef.play().catch(() => {});
+      // Start ASCII conversion for local video
+      connection.ascii.startConversion(localVideoRef, remoteVideoRef);
     }
   });
 
