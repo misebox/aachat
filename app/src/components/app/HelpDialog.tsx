@@ -22,35 +22,21 @@ export const HelpDialog: Component = () => {
           </section>
 
           <section>
-            <h4 class="text-white font-medium mb-2">How to Start</h4>
+            <h4 class="text-white font-medium mb-2">How to Use</h4>
             <ol class="list-decimal list-inside space-y-2 text-gray-300">
-              <li>
-                <strong class="text-white">Host:</strong>
-                <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
-                  <li>Enter a keyword (or use auto-generated)</li>
-                  <li>Click &quot;Connect&quot;</li>
-                  <li>Share keyword with peer</li>
-                  <li>Click &quot;Leave&quot; to end</li>
-                </ul>
-              </li>
-              <li>
-                <strong class="text-white">Guest:</strong>
-                <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
-                  <li>Enter keyword from host</li>
-                  <li>Click &quot;Connect&quot;</li>
-                  <li>Click &quot;Leave&quot; to end</li>
-                  <li>Guest can rejoin after leaving</li>
-                </ul>
-              </li>
+              <li>Enter the same keyword as your peer</li>
+              <li>Click &quot;Connect&quot;</li>
+              <li>Wait for connection (up to 10 min)</li>
+              <li>Click &quot;Leave&quot; to end</li>
             </ol>
           </section>
 
           <section>
             <h4 class="text-white font-medium mb-2">Notes</h4>
             <ul class="list-disc list-inside space-y-1 text-gray-300">
-              <li>Guest must join within 10 minutes</li>
               <li>Camera and microphone permission required</li>
-              <li>Use a unique keyword</li>
+              <li>Use a unique keyword to avoid conflicts</li>
+              <li>Share link with <code class="bg-neutral-800 px-1">?k=keyword</code></li>
             </ul>
           </section>
 
