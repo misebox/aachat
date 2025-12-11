@@ -1,14 +1,14 @@
-# Origin Access Control for UI
-resource "aws_cloudfront_origin_access_control" "ui" {
-  name                              = "${local.resource_prefix}-ui-oac"
-  description                       = "OAC for ${local.resource_prefix} UI"
+# Origin Access Control for App
+resource "aws_cloudfront_origin_access_control" "app" {
+  name                              = "${local.resource_prefix}-app-oac"
+  description                       = "OAC for ${local.resource_prefix} app"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
 }
 
-# CloudFront Distribution for UI
-resource "aws_cloudfront_distribution" "ui" {
+# CloudFront Distribution for App
+resource "aws_cloudfront_distribution" "app" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
@@ -16,15 +16,15 @@ resource "aws_cloudfront_distribution" "ui" {
   aliases             = [local.web_custom_domain]
 
   origin {
-    domain_name              = aws_s3_bucket.ui.bucket_regional_domain_name
-    origin_id                = "S3-${aws_s3_bucket.ui.id}"
-    origin_access_control_id = aws_cloudfront_origin_access_control.ui.id
+    domain_name              = aws_s3_bucket.app.bucket_regional_domain_name
+    origin_id                = "S3-${aws_s3_bucket.app.id}"
+    origin_access_control_id = aws_cloudfront_origin_access_control.app.id
   }
 
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "S3-${aws_s3_bucket.ui.id}"
+    target_origin_id       = "S3-${aws_s3_bucket.app.id}"
     viewer_protocol_policy = "redirect-to-https"
     compress               = true
 

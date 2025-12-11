@@ -1,4 +1,4 @@
-# ACM Certificate for CloudFront UI (must be in us-east-1)
+# ACM Certificate for CloudFront App (must be in us-east-1)
 resource "aws_acm_certificate" "main" {
   provider          = aws.us_east_1
   domain_name       = local.web_custom_domain
