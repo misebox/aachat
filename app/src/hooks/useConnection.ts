@@ -44,6 +44,21 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     clearKeywordTimer();
   });
 
+  // Convert ICE candidate type to user-friendly label
+  function formatConnectionType(iceType: string | null): string {
+    switch (iceType) {
+      case 'host':
+        return 'direct';
+      case 'srflx':
+      case 'prflx':
+        return 'NAT';
+      case 'relay':
+        return 'relay';
+      default:
+        return '';
+    }
+  }
+
   const webrtc = useWebRTC({
     onConnected: async () => {
       clearKeywordTimer();
@@ -53,9 +68,10 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
       // Get connection type
       const connectionType = await webrtc.getConnectionType();
+      const label = formatConnectionType(connectionType);
       callbacks.onConnectionTypeChange?.(connectionType);
       callbacks.onConnected?.();
-      callbacks.onStatusChange?.(connectionType ? `Connected (${connectionType})` : 'Connected');
+      callbacks.onStatusChange?.(label ? `Connected (${label})` : 'Connected');
     },
     onDisconnected: () => {
       if (session.connectionEstablished()) {
