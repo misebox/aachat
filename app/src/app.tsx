@@ -42,12 +42,20 @@ export default function App() {
     },
   });
 
-  // Initialize canvas and setup UI
+  // Initialize canvas, setup UI, and load URL parameters
   onMount(() => {
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
     ui.setupResizeListeners();
+
+    // Load keyword from URL (?k=keyword)
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyword = urlParams.get('k');
+    if (keyword) {
+      appStore.setKeyword(keyword);
+      appStore.setIsKeywordFromURL(true);
+    }
   });
 
   // Sync local stream to video element

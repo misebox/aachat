@@ -26,7 +26,12 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => appStore.setKeyword('')}
+          onClick={() => {
+            appStore.setKeyword('');
+            appStore.setIsKeywordFromURL(false);
+            // Clear URL parameter
+            history.replaceState(null, '', window.location.pathname);
+          }}
           class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
         >
           Clear
