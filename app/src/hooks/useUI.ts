@@ -19,12 +19,11 @@ export function useUI() {
     // Mobile: width <= 768
     if (containerWidth <= 768) {
       // Mobile layout: stacked vertically
-      const headerHeight = 60;
-      const controlsHeight = 60;
-      const statusHeight = 40;
-      const titleHeight = 50; // Two h3 titles
+      const headerHeight = 44;    // py-2(16px) + text-xl(28px)
+      const controlsHeight = 65;  // py-2(16px) + h-12(48px) + border-t(1px)
+      const statusHeight = 36;    // min-h-[36px]
 
-      const availableHeight = containerHeight - headerHeight - controlsHeight - statusHeight - titleHeight;
+      const availableHeight = containerHeight - headerHeight - controlsHeight - statusHeight;
       const heightPerArea = availableHeight / 2;
 
       const fontSizeByHeight = heightPerArea / AA_HEIGHT;
@@ -81,6 +80,9 @@ export function useUI() {
 
     document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--remote-aa-font-size', `${fontSize}px`);
+
+    // Set actual viewport height for ChatArea
+    document.documentElement.style.setProperty('--actual-vh', `${containerHeight}px`);
   }
 
   /**

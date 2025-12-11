@@ -54,7 +54,7 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
           variant="outline"
           onClick={props.onConnect}
           disabled={appStore.isConnecting()}
-          class="border-gray-600 fill-gray-600 text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
+          class="border-gray-600 fill-gray-600 text-md text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
         >
           Connect
         </Button>
