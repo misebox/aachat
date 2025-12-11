@@ -1,4 +1,4 @@
-import { Component, createSignal } from 'solid-js';
+import { Component, createSignal, createEffect } from 'solid-js';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,17 @@ interface DeviceDialogProps {
 }
 
 export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
-  const [tempVideoDevice, setTempVideoDevice] = createSignal(appStore.selectedVideoDevice());
-  const [tempAudioDevice, setTempAudioDevice] = createSignal(appStore.selectedAudioDevice());
+  const [tempVideoDevice, setTempVideoDevice] = createSignal('');
+  const [tempAudioDevice, setTempAudioDevice] = createSignal('');
+
+  // When dialog opens, refresh devices and sync current selection
+  createEffect(() => {
+    if (appStore.deviceDialogOpen()) {
+      props.onRefresh();
+      setTempVideoDevice(appStore.selectedVideoDevice());
+      setTempAudioDevice(appStore.selectedAudioDevice());
+    }
+  });
 
   const handleApply = () => {
     props.onApply(tempVideoDevice(), tempAudioDevice());
