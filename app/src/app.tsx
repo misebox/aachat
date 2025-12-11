@@ -43,7 +43,7 @@ export default function App() {
   });
 
   // Initialize canvas, setup UI, and load URL parameters
-  onMount(() => {
+  onMount(async () => {
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
@@ -56,6 +56,9 @@ export default function App() {
       appStore.setKeyword(keyword);
       appStore.setIsKeywordFromURL(true);
     }
+
+    // Start camera on app load
+    await connection.media.startCamera();
   });
 
   // Sync local stream to video element
@@ -156,12 +159,14 @@ export default function App() {
     }
   };
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     connection.disconnect();
     appStore.setConnectionState('idle');
     appStore.setStatusText('');
     appStore.setLocalAscii('');
     appStore.setRemoteAscii('');
+    // Restart camera after disconnect
+    await connection.media.startCamera();
   };
 
   const handleRefreshDevices = async () => {
