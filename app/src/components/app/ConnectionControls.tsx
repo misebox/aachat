@@ -63,7 +63,6 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
       <IconButton
         onClick={() => appStore.setDeviceDialogOpen(true)}
         icon={<Settings class="w-4 h-4" />}
-        class="hidden md:inline-flex"
       />
 
       <IconButton
