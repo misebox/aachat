@@ -1,5 +1,12 @@
-import { createSignal } from 'solid-js';
-import { SessionState, TIMEOUT_OFFER_PUT, TIMEOUT_SIGNALING } from '@/lib/constants';
+import { createSignal, onCleanup } from 'solid-js';
+import {
+  SessionState,
+  TIMEOUT_OFFER_PUT,
+  TIMEOUT_SIGNALING,
+  KEYWORD_TIMER_MAX,
+  RETRY_DELAY,
+  CONNECT_MAX_RETRIES,
+} from '@/lib/constants';
 import { generateSessionToken } from '@/lib/utils';
 import { useSignaling } from './useSignaling';
 import { useSession } from './useSession';
@@ -13,6 +20,8 @@ export interface ConnectionCallbacks {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
+  onTimerUpdate?: (remaining: string) => void;
+  onConnectionTypeChange?: (type: string | null) => void;
 }
 
 /**
@@ -25,18 +34,37 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
   const ascii = useAscii();
 
   const [remoteStream, setRemoteStream] = createSignal<MediaStream | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = createSignal(0);
+  const maxReconnectAttempts = 3;
+
+  let keywordTimer: ReturnType<typeof setTimeout> | null = null;
+  let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+  onCleanup(() => {
+    clearKeywordTimer();
+  });
 
   const webrtc = useWebRTC({
-    onConnected: () => {
+    onConnected: async () => {
+      clearKeywordTimer();
+      setReconnectAttempts(0);
       session.setConnectionEstablished(true);
       session.setState(SessionState.CONNECTED);
+
+      // Get connection type
+      const connectionType = await webrtc.getConnectionType();
+      callbacks.onConnectionTypeChange?.(connectionType);
       callbacks.onConnected?.();
-      callbacks.onStatusChange?.('Connected');
+      callbacks.onStatusChange?.(connectionType ? `Connected (${connectionType})` : 'Connected');
     },
     onDisconnected: () => {
       if (session.connectionEstablished()) {
-        callbacks.onStatusChange?.('Peer disconnected. Reconnecting...');
-        // Could implement reconnect logic here
+        const keyword = session.currentKeyword();
+        if (keyword) {
+          callbacks.onStatusChange?.('Peer disconnected. Reconnecting...');
+          reconnect(keyword);
+          return;
+        }
       }
       callbacks.onDisconnected?.();
     },
@@ -94,6 +122,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     // 5. Create Offer
     session.setState(SessionState.H_OFFER_PUT);
     callbacks.onStatusChange?.('Waiting for guest...');
+    startKeywordTimer();
 
     const offer = await webrtc.createOffer();
     logger.sig('Offer created');
@@ -193,6 +222,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     // 2. GET offer
     session.setState(SessionState.G_OFFER_GET);
     callbacks.onStatusChange?.('Connecting to host...');
+    startKeywordTimer();
 
     const offerPath = session.getChannelPath('offer');
     const offerData = await signaling.receive<{ type: string; sdp: string }>(
@@ -328,9 +358,96 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
   }
 
   /**
+   * Start keyword timer (10 min timeout)
+   */
+  function startKeywordTimer(): void {
+    updateTimer();
+    timerInterval = setInterval(() => {
+      updateTimer();
+    }, 1000);
+
+    keywordTimer = setTimeout(() => {
+      if (!session.connectionEstablished()) {
+        logger.sig('keyword timer expired');
+        cleanup();
+        callbacks.onError?.('Connection timeout');
+        callbacks.onTimerUpdate?.('');
+      }
+    }, KEYWORD_TIMER_MAX);
+  }
+
+  /**
+   * Clear keyword timer
+   */
+  function clearKeywordTimer(): void {
+    if (keywordTimer) {
+      clearTimeout(keywordTimer);
+      keywordTimer = null;
+    }
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    callbacks.onTimerUpdate?.('');
+  }
+
+  /**
+   * Update timer display
+   */
+  function updateTimer(): void {
+    const remaining = session.getRemainingTime(KEYWORD_TIMER_MAX / 1000);
+    if (!session.connectionEstablished() && remaining > 0) {
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      const timerText = `${minutes}:${String(seconds).padStart(2, '0')}`;
+      callbacks.onTimerUpdate?.(timerText);
+    }
+  }
+
+  /**
+   * Reconnect to session
+   */
+  async function reconnect(keyword: string): Promise<void> {
+    logger.sig('reconnect:', keyword);
+
+    const attempts = reconnectAttempts() + 1;
+    setReconnectAttempts(attempts);
+
+    if (attempts > maxReconnectAttempts) {
+      logger.sig('max reconnect attempts reached');
+      cleanup();
+      callbacks.onError?.('Reconnection failed');
+      callbacks.onDisconnected?.();
+      return;
+    }
+
+    // Close existing connection
+    webrtc.close();
+    session.reset();
+    signaling.abort();
+
+    try {
+      session.setState(SessionState.HEAD_CHECK);
+      const offerPath = `${keyword}/offer`;
+      const exists = await signaling.exists(offerPath);
+      logger.sig('reconnect HEAD:', exists ? '200 → guest' : '404 → host');
+
+      if (exists) {
+        await guestSession(keyword);
+      } else {
+        await hostSession(keyword);
+      }
+    } catch (error) {
+      logger.error('SIG', 'reconnect error:', error);
+      callbacks.onStatusChange?.('Reconnection failed');
+      setTimeout(() => reconnect(keyword), RETRY_DELAY);
+    }
+  }
+
+  /**
    * Main connect function - determines role and starts appropriate session
    */
-  async function connect(keyword: string): Promise<boolean> {
+  async function connect(keyword: string, retryCount = 0): Promise<boolean> {
     if (!keyword.trim()) {
       callbacks.onError?.('Please enter a keyword');
       return false;
@@ -342,17 +459,31 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     session.setState(SessionState.HEAD_CHECK);
     callbacks.onStatusChange?.('Checking room...');
 
-    const offerPath = `${keyword}/offer`;
-    const exists = await signaling.exists(offerPath);
+    try {
+      const offerPath = `${keyword}/offer`;
+      const exists = await signaling.exists(offerPath);
 
-    if (exists) {
-      // Offer exists = join as guest
-      logger.log('Offer found, joining as guest');
-      return await guestSession(keyword);
-    } else {
-      // No offer = become host
-      logger.log('No offer found, becoming host');
-      return await hostSession(keyword);
+      if (exists) {
+        // Offer exists = join as guest
+        logger.log('Offer found, joining as guest');
+        return await guestSession(keyword);
+      } else {
+        // No offer = become host
+        logger.log('No offer found, becoming host');
+        return await hostSession(keyword);
+      }
+    } catch (error) {
+      logger.error('SIG', 'connect error:', error);
+      cleanup();
+
+      if (retryCount < CONNECT_MAX_RETRIES) {
+        logger.sig('retry:', retryCount + 1);
+        await new Promise((r) => setTimeout(r, RETRY_DELAY));
+        return connect(keyword, retryCount + 1);
+      } else {
+        callbacks.onError?.('Connection failed');
+        return false;
+      }
     }
   }
 
@@ -361,12 +492,14 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
    */
   function cleanup(): void {
     logger.log('Cleanup');
+    clearKeywordTimer();
     signaling.abort();
     webrtc.close();
     media.stopCamera();
     ascii.stopConversion();
     session.reset();
     setRemoteStream(null);
+    setReconnectAttempts(0);
   }
 
   /**
