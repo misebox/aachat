@@ -20,6 +20,7 @@ export const AA_HEIGHT = 30;
 // Signaling timeouts (seconds)
 export const TIMEOUT_OFFER_PUT = 60; // H:OFFER_PUT - waiting for guest
 export const TIMEOUT_SIGNALING = 5; // Other operations
+export const MAX_OFFER_PUT_RETRIES = 30; // Max retries for H_OFFER_PUT (30 min total)
 
 // Retry/Timer settings (milliseconds)
 export const ICE_GATHERING_TIMEOUT = 3000;

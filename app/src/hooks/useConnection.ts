@@ -6,6 +6,7 @@ import {
   KEYWORD_TIMER_MAX,
   RETRY_DELAY,
   CONNECT_MAX_RETRIES,
+  MAX_OFFER_PUT_RETRIES,
 } from '@/lib/constants';
 import { generateSessionToken } from '@/lib/utils';
 import { useSignaling } from './useSignaling';
@@ -137,27 +138,47 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 5. Create Offer
     session.setState(SessionState.H_OFFER_PUT);
-    callbacks.onStatusChange?.('Waiting for guest...');
     startKeywordTimer();
 
     const offer = await webrtc.createOffer();
     logger.sig('Offer created');
 
-    // 6. PUT offer (wait up to 60s for guest)
+    // 6. PUT offer with retry (wait up to 60s per attempt, max 30 attempts)
     const offerPath = session.getChannelPath('offer');
-    const putResult = await signaling.send(
-      offerPath,
-      { type: 'offer', sdp: offer.sdp },
-      keyword,
-      TIMEOUT_OFFER_PUT
-    );
+    let putResult: { success: boolean; timedOut?: boolean } = { success: false };
+
+    for (let attempt = 1; attempt <= MAX_OFFER_PUT_RETRIES; attempt++) {
+      // Check if session was cancelled
+      if (!session.sessionActive()) {
+        logger.log('Session cancelled during offer retry');
+        return false;
+      }
+
+      callbacks.onStatusChange?.(`Waiting for guest... (${attempt}/${MAX_OFFER_PUT_RETRIES})`);
+
+      putResult = await signaling.send(
+        offerPath,
+        { type: 'offer', sdp: offer.sdp },
+        keyword,
+        TIMEOUT_OFFER_PUT
+      );
+
+      if (putResult.success) {
+        break;
+      }
+
+      if (!putResult.timedOut) {
+        // Non-timeout error, don't retry
+        callbacks.onError?.('Failed to send offer');
+        cleanup();
+        return false;
+      }
+
+      logger.sig(`Offer PUT timed out, attempt ${attempt}/${MAX_OFFER_PUT_RETRIES}`);
+    }
 
     if (!putResult.success) {
-      if (putResult.timedOut) {
-        callbacks.onError?.('No guest joined within timeout');
-      } else {
-        callbacks.onError?.('Failed to send offer');
-      }
+      callbacks.onError?.('No guest joined after maximum retries');
       cleanup();
       return false;
     }
