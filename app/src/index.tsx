@@ -1,4 +1,9 @@
-// @refresh reload
-import { mount, StartClient } from "@solidjs/start/client";
+/* @refresh reload */
+import { render } from 'solid-js/web';
+import './global.css';
+import App from './App.tsx';
 
-mount(() => <StartClient />, document.getElementById("app")!);
+const root = document.getElementById('root');
+if (!root) throw new Error('Root element not found');
+
+render(() => <App />, root);
