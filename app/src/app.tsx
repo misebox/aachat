@@ -1,5 +1,5 @@
 import { Suspense, onMount, onCleanup, createEffect } from 'solid-js';
-import { HelpCircle } from 'lucide-solid';
+import { FiHelpCircle } from 'solid-icons/fi';
 
 import './app.css';
 import {
@@ -191,7 +191,7 @@ export default function App() {
         {/* Mobile help button */}
         <IconButton
           onClick={() => appStore.setHelpDialogOpen(true)}
-          icon={<HelpCircle class="w-5 h-5" />}
+          icon={<FiHelpCircle size={36} />}
           class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
         />
 

@@ -10,10 +10,10 @@ interface IconButtonProps {
 export const IconButton: Component<IconButtonProps> = (props) => {
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={props.onClick}
-      class={`border-gray-600 text-white hover:bg-gray-800 hover:border-white rounded-full w-9 h-9 ${props.class ?? ''}`}
+      class={`border-gray-600 text-white hover:bg-gray-800 hover:border-white rounded-full w-12 h-12 [&_svg]:size-auto ${props.class ?? ''}`}
     >
       {props.icon}
     </Button>

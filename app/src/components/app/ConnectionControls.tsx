@@ -1,5 +1,5 @@
 import { Component, Show } from 'solid-js';
-import { Settings, HelpCircle } from 'lucide-solid';
+import { FiSettings, FiHelpCircle } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import { KeywordInput } from './KeywordInput';
 import { IconButton } from './IconButton';
@@ -54,7 +54,7 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
           variant="outline"
           onClick={props.onConnect}
           disabled={appStore.isConnecting()}
-          class="border-gray-600 text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
+          class="border-gray-600 fill-gray-600 text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
         >
           Connect
         </Button>
@@ -62,12 +62,12 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
 
       <IconButton
         onClick={() => appStore.setDeviceDialogOpen(true)}
-        icon={<Settings class="w-4 h-4" />}
+        icon={<FiSettings size={36} />}
       />
 
       <IconButton
         onClick={() => appStore.setHelpDialogOpen(true)}
-        icon={<HelpCircle class="w-4 h-4" />}
+        icon={<FiHelpCircle size={36} />}
         class="hidden md:inline-flex"
       />
     </div>
