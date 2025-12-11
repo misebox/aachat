@@ -32,25 +32,23 @@ export function useSession() {
   /**
    * Start a new session
    */
-  function startSession(host: boolean, keyword: string, hash?: string): void {
+  function startSession(host: boolean, keyword: string): void {
     setIsHost(host);
     setCurrentKeyword(keyword);
-    setSessionHash(hash || generateSessionToken());
     setSessionActive(true);
     setStartTime(Date.now());
     setSessionToken(generateSessionToken());
   }
 
   /**
-   * Get channel path for signaling
+   * Get channel path for signaling (simple: keyword/suffix)
    */
   function getChannelPath(suffix: string): string {
     const keyword = currentKeyword();
-    const hash = sessionHash();
-    if (!keyword || !hash) {
+    if (!keyword) {
       throw new Error('Session not started');
     }
-    return `${keyword}/${hash}/${suffix}`;
+    return `${keyword}/${suffix}`;
   }
 
   /**

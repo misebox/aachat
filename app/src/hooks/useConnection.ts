@@ -51,14 +51,13 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
   /**
    * Host session flow:
    * 1. Start camera
-   * 2. HEAD check (expect 404 = no existing host)
-   * 3. Create PeerConnection
-   * 4. Setup DataChannel
-   * 5. Create Offer
-   * 6. PUT offer (wait for guest up to 60s)
-   * 7. GET answer
-   * 8. Set remote description
-   * 9. Exchange ICE candidates
+   * 2. Create PeerConnection
+   * 3. Setup DataChannel
+   * 4. Create Offer
+   * 5. PUT offer (wait for guest up to 60s)
+   * 6. GET answer
+   * 7. Set remote description
+   * 8. Exchange ICE candidates
    */
   async function hostSession(keyword: string): Promise<boolean> {
     logger.log('=== HOST SESSION START ===');
@@ -72,23 +71,8 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     }
     logger.log('Camera started');
 
-    // 2. HEAD check
-    session.setState(SessionState.HEAD_CHECK);
-    callbacks.onStatusChange?.('Checking room...');
-
-    const sessionHash = generateSessionToken();
-    const offerPath = `${keyword}/${sessionHash}/offer`;
-
-    const exists = await signaling.exists(offerPath);
-    if (exists) {
-      callbacks.onError?.('Room already exists. Try as guest or use different keyword.');
-      cleanup();
-      return false;
-    }
-    logger.log('Room available, becoming host');
-
-    // Initialize session
-    session.startSession(true, keyword, sessionHash);
+    // Initialize session (no hash, simple paths)
+    session.startSession(true, keyword);
     signaling.setCancelKey(session.sessionToken() || generateSessionToken());
 
     // 3. Create PeerConnection
@@ -115,6 +99,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     logger.sig('Offer created');
 
     // 6. PUT offer (wait up to 60s for guest)
+    const offerPath = session.getChannelPath('offer');
     const putResult = await signaling.send(
       offerPath,
       { type: 'offer', sdp: offer.sdp },
@@ -181,14 +166,13 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
   /**
    * Guest session flow:
    * 1. Start camera
-   * 2. HEAD check (expect 200 = host exists)
-   * 3. GET offer
-   * 4. Create PeerConnection
-   * 5. Set remote description
-   * 6. Setup DataChannel
-   * 7. Create Answer
-   * 8. PUT answer
-   * 9. Exchange ICE candidates
+   * 2. GET offer
+   * 3. Create PeerConnection
+   * 4. Set remote description
+   * 5. Setup DataChannel
+   * 6. Create Answer
+   * 7. PUT answer
+   * 8. Exchange ICE candidates
    */
   async function guestSession(keyword: string): Promise<boolean> {
     logger.log('=== GUEST SESSION START ===');
@@ -202,29 +186,16 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     }
     logger.log('Camera started');
 
-    // 2. HEAD check
-    session.setState(SessionState.HEAD_CHECK);
-    callbacks.onStatusChange?.('Looking for host...');
+    // Initialize session
+    session.startSession(false, keyword);
+    signaling.setCancelKey(session.sessionToken() || generateSessionToken());
 
-    // Try to find an existing offer
-    const sessionHash = generateSessionToken();
-    const offerPath = `${keyword}/${sessionHash}/offer`;
-
-    // For guest, we need to GET the offer that host PUT
-    // The sessionHash should come from discovering the host's offer
-    // For simplicity, we'll use polling or assume same hash pattern
-
-    // Actually, in the legacy code, guest GETs from the same path pattern
-    // Let's check if offer exists first
+    // 2. GET offer
     session.setState(SessionState.G_OFFER_GET);
     callbacks.onStatusChange?.('Connecting to host...');
 
-    // Initialize session (we'll update hash after getting offer)
-    session.startSession(false, keyword, sessionHash);
-    signaling.setCancelKey(session.sessionToken() || generateSessionToken());
-
-    // 3. GET offer
-    const offerData = await signaling.receive<{ type: string; sdp: string; sessionHash?: string }>(
+    const offerPath = session.getChannelPath('offer');
+    const offerData = await signaling.receive<{ type: string; sdp: string }>(
       offerPath,
       keyword,
       TIMEOUT_SIGNALING
@@ -367,13 +338,11 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     logger.log('Connect requested with keyword:', keyword);
 
-    // HEAD check to determine role
+    // HEAD check to determine role (no hash, just keyword/offer)
     session.setState(SessionState.HEAD_CHECK);
     callbacks.onStatusChange?.('Checking room...');
 
-    const sessionHash = generateSessionToken();
-    const offerPath = `${keyword}/${sessionHash}/offer`;
-
+    const offerPath = `${keyword}/offer`;
     const exists = await signaling.exists(offerPath);
 
     if (exists) {
