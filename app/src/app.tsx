@@ -48,16 +48,33 @@ export default function App() {
     }
     ui.setupResizeListeners();
 
-    // Load keyword from URL (?k=keyword)
-    const urlParams = new URLSearchParams(window.location.search);
-    const keyword = urlParams.get('k');
-    if (keyword) {
+    // Check for /direct/{keyword} path for auto-connect
+    const pathname = window.location.pathname;
+    const directMatch = pathname.match(/^\/direct\/(.+)$/);
+    let autoConnect = false;
+
+    if (directMatch) {
+      const keyword = decodeURIComponent(directMatch[1]);
       appStore.setKeyword(keyword);
       appStore.setIsKeywordFromURL(true);
+      autoConnect = true;
+    } else {
+      // Load keyword from URL (?k=keyword)
+      const urlParams = new URLSearchParams(window.location.search);
+      const keyword = urlParams.get('k');
+      if (keyword) {
+        appStore.setKeyword(keyword);
+        appStore.setIsKeywordFromURL(true);
+      }
     }
 
     // Start camera on app load
     await connection.media.startCamera();
+
+    // Auto-connect if accessed via /direct/{keyword}
+    if (autoConnect) {
+      handleConnect();
+    }
   });
 
   // Sync local stream to video element and start ASCII conversion
