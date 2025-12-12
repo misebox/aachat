@@ -20,6 +20,7 @@ export interface ConnectionCallbacks {
   onStatusChange?: (status: string) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
+  onPeerLeft?: () => void;
   onError?: (error: string) => void;
   onTimerUpdate?: (remaining: string) => void;
   onConnectionTypeChange?: (type: string | null) => void;
@@ -75,6 +76,9 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
       callbacks.onStatusChange?.(label ? `Connected (${label})` : 'Connected');
     },
     onDisconnected: () => {
+      // Clear remote stream immediately when peer disconnects
+      setRemoteStream(null);
+
       if (session.connectionEstablished()) {
         const keyword = session.currentKeyword();
         if (keyword) {
@@ -87,6 +91,22 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     },
     onRemoteStream: (stream) => {
       setRemoteStream(stream);
+    },
+    onDataChannelMessage: (message) => {
+      if (message.type === 'leave') {
+        // Peer wants to leave - send ack and end call
+        logger.rtc('Received leave request');
+        webrtc.sendMessage({ type: 'leave-ack' });
+        setRemoteStream(null);
+        cleanup();
+        callbacks.onPeerLeft?.();
+      } else if (message.type === 'leave-ack') {
+        // Peer acknowledged our leave - end call
+        logger.rtc('Received leave ack');
+        setRemoteStream(null);
+        cleanup();
+        callbacks.onPeerLeft?.();
+      }
     },
   });
 
@@ -544,9 +564,27 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
    */
   function disconnect(): void {
     logger.log('Disconnect requested');
-    session.endSession();
-    cleanup();
-    callbacks.onStatusChange?.('Disconnected');
+
+    // Try to send leave message to peer
+    const sent = webrtc.sendMessage({ type: 'leave' });
+
+    if (sent) {
+      // Wait for leave-ack, but timeout after 1 second
+      setTimeout(() => {
+        // If still connected (no ack received), force cleanup
+        if (session.connectionEstablished()) {
+          logger.log('Leave ack timeout, force cleanup');
+          setRemoteStream(null);
+          cleanup();
+          callbacks.onPeerLeft?.();
+        }
+      }, 1000);
+    } else {
+      // DataChannel not available, cleanup immediately
+      session.endSession();
+      cleanup();
+      callbacks.onStatusChange?.('Disconnected');
+    }
   }
 
   return {

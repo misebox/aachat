@@ -2,12 +2,18 @@ import { createSignal, onCleanup } from 'solid-js';
 import { STUN_SERVERS, ICE_GATHERING_TIMEOUT } from '@/lib/constants';
 import { logger } from './useLogger';
 
+export interface DataChannelMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
 export interface WebRTCCallbacks {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onRemoteStream?: (stream: MediaStream) => void;
   onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
   onIceConnectionStateChange?: (state: RTCIceConnectionState) => void;
+  onDataChannelMessage?: (message: DataChannelMessage) => void;
 }
 
 /**
@@ -133,15 +139,32 @@ export function useWebRTC(callbacks: WebRTCCallbacks = {}) {
 
   function setupDataChannelEvents(dc: RTCDataChannel): void {
     dc.onopen = () => {
-      console.log('Data channel opened');
+      logger.rtc('DataChannel opened');
     };
     dc.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      console.log('Data channel message:', message);
+      try {
+        const message = JSON.parse(event.data) as DataChannelMessage;
+        logger.rtc('DataChannel message:', message.type);
+        callbacks.onDataChannelMessage?.(message);
+      } catch {
+        logger.rtc('DataChannel message parse error');
+      }
     };
     dc.onerror = (error) => {
       console.error('Data channel error:', error);
     };
+  }
+
+  /**
+   * Send message via DataChannel
+   */
+  function sendMessage(message: DataChannelMessage): boolean {
+    const dc = dataChannel();
+    if (dc && dc.readyState === 'open') {
+      dc.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -258,6 +281,7 @@ export function useWebRTC(callbacks: WebRTCCallbacks = {}) {
     addIceCandidate,
     addIceCandidates,
     getConnectionType,
+    sendMessage,
     close,
   };
 }

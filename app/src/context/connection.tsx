@@ -7,6 +7,8 @@ interface ConnectionContextValue {
   applyDevices: (videoDeviceId: string, audioDeviceId: string) => Promise<void>;
   setLocalVideoRef: (el: HTMLVideoElement) => void;
   setRemoteVideoRef: (el: HTMLVideoElement) => void;
+  toggleVideo: () => void;
+  toggleAudio: () => void;
 }
 
 const ConnectionContext = createContext<ConnectionContextValue>();

@@ -1,6 +1,6 @@
 import { onMount, onCleanup } from 'solid-js';
 import { useSearchParams, useNavigate } from '@solidjs/router';
-import { FiSettings, FiHelpCircle, FiShare2 } from 'solid-icons/fi';
+import { FiSettings, FiHelpCircle, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
@@ -49,29 +49,19 @@ export const HomePage = () => {
   return (
     <>
       <Header />
+      {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
-        <KeywordInput
-          value={appStore.keyword()}
-          onInput={appStore.setKeyword}
-          readonly={appStore.isKeywordFromURL()}
+        <IconButton
+          onClick={connection.toggleVideo}
+          icon={appStore.videoEnabled() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
+          class={appStore.videoEnabled() ? '' : 'text-red-500'}
         />
 
-        <Button
-          variant="outline"
-          onClick={handleClear}
-          disabled={appStore.keyword().length === 0}
-          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white disabled:opacity-50"
-        >
-          Clear
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handleEnter}
-          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white"
-        >
-          Enter
-        </Button>
+        <IconButton
+          onClick={connection.toggleAudio}
+          icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
+          class={appStore.audioEnabled() ? '' : 'text-red-500'}
+        />
 
         <IconButton
           onClick={() => appStore.setShareDialogOpen(true)}
@@ -89,6 +79,33 @@ export const HomePage = () => {
           class="hidden md:inline-flex"
         />
       </div>
+
+      {/* Keyword controls - PC: row 2, Mobile: above footer */}
+      <div class="flex items-center justify-center gap-2 py-2 px-2 md:static fixed bottom-[65px] left-0 right-0 bg-black md:bg-transparent z-40">
+        <KeywordInput
+          value={appStore.keyword()}
+          onInput={appStore.setKeyword}
+          readonly={appStore.isKeywordFromURL()}
+        />
+
+        <Button
+          variant="outline"
+          onClick={handleEnter}
+          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white"
+        >
+          Enter
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={handleClear}
+          disabled={appStore.keyword().length === 0}
+          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white disabled:opacity-50"
+        >
+          Clear
+        </Button>
+      </div>
+
       <StatusBar variant="desktop" />
       <ChatArea
         localVideoRef={connection.setLocalVideoRef}

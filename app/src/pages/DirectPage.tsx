@@ -1,6 +1,6 @@
 import { onMount, createEffect, on, Show } from 'solid-js';
-import { useParams } from '@solidjs/router';
-import { FiSettings, FiShare2 } from 'solid-icons/fi';
+import { useParams, useNavigate } from '@solidjs/router';
+import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
@@ -14,8 +14,14 @@ import { MAX_DIRECT_CONNECT_RETRIES } from '@/lib/constants';
 
 export const DirectPage = () => {
   const params = useParams<{ keyword: string }>();
+  const navigate = useNavigate();
   const connection = useConnectionContext();
   let retryCount = 0;
+
+  const handleNavigateHome = async () => {
+    await connection.disconnect();
+    navigate('/');
+  };
 
   onMount(() => {
     const keyword = decodeURIComponent(params.keyword);
@@ -58,8 +64,23 @@ export const DirectPage = () => {
 
   return (
     <>
-      <Header />
+      <Header onNavigateHome={handleNavigateHome} />
+      <div class="fixed top-1 left-1 z-[100] bg-black/80 px-2 py-1 rounded text-white text-sm font-mono">
+        {appStore.keyword()}
+      </div>
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
+        <IconButton
+          onClick={connection.toggleVideo}
+          icon={appStore.videoEnabled() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
+          class={appStore.videoEnabled() ? '' : 'text-red-500'}
+        />
+
+        <IconButton
+          onClick={connection.toggleAudio}
+          icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
+          class={appStore.audioEnabled() ? '' : 'text-red-500'}
+        />
+
         <Show
           when={appStore.isConnected() || appStore.isConnecting()}
           fallback={
