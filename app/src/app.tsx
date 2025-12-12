@@ -57,6 +57,7 @@ export default function App() {
       const keyword = decodeURIComponent(directMatch[1]);
       appStore.setKeyword(keyword);
       appStore.setIsKeywordFromURL(true);
+      appStore.setIsDirectMode(true);
       autoConnect = true;
     } else {
       // Load keyword from URL (?k=keyword)
