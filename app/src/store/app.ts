@@ -23,6 +23,7 @@ const [remoteAscii, setRemoteAscii] = createSignal('');
 // Dialogs
 const [deviceDialogOpen, setDeviceDialogOpen] = createSignal(false);
 const [helpDialogOpen, setHelpDialogOpen] = createSignal(false);
+const [shareDialogOpen, setShareDialogOpen] = createSignal(false);
 
 // Keyword state
 const [isKeywordFromURL, setIsKeywordFromURL] = createSignal(false);
@@ -72,6 +73,8 @@ export const appStore = {
   setDeviceDialogOpen,
   helpDialogOpen,
   setHelpDialogOpen,
+  shareDialogOpen,
+  setShareDialogOpen,
 
   // Keyword state
   isKeywordFromURL,

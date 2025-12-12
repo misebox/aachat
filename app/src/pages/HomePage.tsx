@@ -1,6 +1,6 @@
 import { onMount } from 'solid-js';
 import { useSearchParams, useNavigate } from '@solidjs/router';
-import { FiSettings, FiHelpCircle } from 'solid-icons/fi';
+import { FiSettings, FiHelpCircle, FiShare2 } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
@@ -8,6 +8,7 @@ import {
   ChatArea,
   KeywordInput,
   IconButton,
+  ShareDialog,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
@@ -66,6 +67,11 @@ export const HomePage = () => {
         >
           Enter
         </Button>
+
+        <IconButton
+          onClick={() => appStore.setShareDialogOpen(true)}
+          icon={<FiShare2 size={36} />}
+        />
 
         <IconButton
           onClick={() => appStore.setDeviceDialogOpen(true)}

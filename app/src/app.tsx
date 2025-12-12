@@ -2,7 +2,7 @@ import { Suspense, onMount, onCleanup, createEffect, ParentProps } from 'solid-j
 import { FiHelpCircle } from 'solid-icons/fi';
 
 import './app.css';
-import { DeviceDialog, HelpDialog, IconButton } from '@/components/app';
+import { DeviceDialog, HelpDialog, ShareDialog, IconButton } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnection, useUI } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
@@ -238,6 +238,10 @@ export default function App(props: ParentProps) {
           {/* Dialogs */}
           <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
           <HelpDialog />
+          <ShareDialog
+            open={appStore.shareDialogOpen()}
+            onOpenChange={appStore.setShareDialogOpen}
+          />
         </div>
       </ConnectionProvider>
     </Suspense>
