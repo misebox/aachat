@@ -16,59 +16,47 @@ export const ConnectionControls: Component<ConnectionControlsProps> = (props) =>
 
   return (
     <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
-      <Show when={!appStore.isDirectMode()}>
-        <KeywordInput
-          value={appStore.keyword()}
-          onInput={appStore.setKeyword}
-          readonly={isKeywordLocked()}
-        />
+      <KeywordInput
+        value={appStore.keyword()}
+        onInput={appStore.setKeyword}
+        readonly={isKeywordLocked()}
+      />
 
-        <Show when={appStore.keyword().length > 0 && appStore.isIdle()}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              appStore.setKeyword('');
-              appStore.setIsKeywordFromURL(false);
-              // Clear URL parameter
-              history.replaceState(null, '', window.location.pathname);
-            }}
-            class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
-          >
-            Clear
-          </Button>
-        </Show>
-
-        <Show
-          when={!appStore.isConnected() && !appStore.isConnecting()}
-          fallback={
-            <Button
-              variant="outline"
-              onClick={props.onLeave}
-              class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
-            >
-              Leave
-            </Button>
-          }
-        >
-          <Button
-            variant="outline"
-            onClick={props.onConnect}
-            disabled={appStore.isConnecting()}
-            class="border-gray-600 fill-gray-600 text-md text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
-          >
-            Connect
-          </Button>
-        </Show>
-      </Show>
-
-      <Show when={appStore.isDirectMode() && appStore.isConnected()}>
+      <Show when={appStore.keyword().length > 0 && appStore.isIdle()}>
         <Button
           variant="outline"
-          onClick={props.onLeave}
+          size="sm"
+          onClick={() => {
+            appStore.setKeyword('');
+            appStore.setIsKeywordFromURL(false);
+            // Clear URL parameter
+            history.replaceState(null, '', window.location.pathname);
+          }}
           class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
         >
-          Leave
+          Clear
+        </Button>
+      </Show>
+
+      <Show
+        when={!appStore.isConnected() && !appStore.isConnecting()}
+        fallback={
+          <Button
+            variant="outline"
+            onClick={props.onLeave}
+            class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
+          >
+            Leave
+          </Button>
+        }
+      >
+        <Button
+          variant="outline"
+          onClick={props.onConnect}
+          disabled={appStore.isConnecting()}
+          class="border-gray-600 fill-gray-600 text-md text-white hover:bg-gray-800 hover:border-white disabled:opacity-50"
+        >
+          Connect
         </Button>
       </Show>
 

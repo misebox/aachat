@@ -1,21 +1,14 @@
-import { Suspense, onMount, onCleanup, createEffect } from 'solid-js';
+import { Suspense, onMount, onCleanup, createEffect, ParentProps } from 'solid-js';
 import { FiHelpCircle } from 'solid-icons/fi';
 
 import './app.css';
-import {
-  Header,
-  ConnectionControls,
-  StatusBar,
-  ChatArea,
-  DeviceDialog,
-  HelpDialog,
-  IconButton,
-} from '@/components/app';
+import { DeviceDialog, HelpDialog, IconButton } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnection, useUI } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
+import { ConnectionProvider } from '@/context/connection';
 
-export default function App() {
+export default function App(props: ParentProps) {
   let localVideoRef: HTMLVideoElement | undefined;
   let remoteVideoRef: HTMLVideoElement | undefined;
   let canvasRef: HTMLCanvasElement | undefined;
@@ -39,7 +32,7 @@ export default function App() {
     },
   });
 
-  // Initialize canvas, setup UI, and load URL parameters
+  // Initialize canvas, setup UI, and start camera
   onMount(async () => {
     document.title = APP_TITLE;
 
@@ -48,34 +41,9 @@ export default function App() {
     }
     ui.setupResizeListeners();
 
-    // Check for /direct/{keyword} path for auto-connect
-    const pathname = window.location.pathname;
-    const directMatch = pathname.match(/^\/direct\/(.+)$/);
-    let autoConnect = false;
-
-    if (directMatch) {
-      const keyword = decodeURIComponent(directMatch[1]);
-      appStore.setKeyword(keyword);
-      appStore.setIsKeywordFromURL(true);
-      appStore.setIsDirectMode(true);
-      autoConnect = true;
-    } else {
-      // Load keyword from URL (?k=keyword)
-      const urlParams = new URLSearchParams(window.location.search);
-      const keyword = urlParams.get('k');
-      if (keyword) {
-        appStore.setKeyword(keyword);
-        appStore.setIsKeywordFromURL(true);
-      }
-    }
-
     // Start camera on app load
     await connection.media.startCamera();
-
-    // Auto-connect if accessed via /direct/{keyword}
-    if (autoConnect) {
-      handleConnect();
-    }
+    appStore.setCameraReady(true);
   });
 
   // Sync local stream to video element and start ASCII conversion
@@ -206,33 +174,38 @@ export default function App() {
     }
   };
 
+  const connectionContextValue = {
+    connect: handleConnect,
+    disconnect: handleLeave,
+    refreshDevices: handleRefreshDevices,
+    applyDevices: handleApplyDevices,
+    setLocalVideoRef: (el: HTMLVideoElement) => { localVideoRef = el; },
+    setRemoteVideoRef: (el: HTMLVideoElement) => { remoteVideoRef = el; },
+  };
+
   return (
     <Suspense>
-      <div class="min-h-screen bg-black text-white font-mono overflow-x-hidden">
-        {/* Mobile help button */}
-        <IconButton
-          onClick={() => appStore.setHelpDialogOpen(true)}
-          icon={<FiHelpCircle size={36} />}
-          class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
-        />
-
-        <div class="container max-w-full mx-0 px-1 py-2">
-          <Header />
-          <ConnectionControls onConnect={handleConnect} onLeave={handleLeave} />
-          <StatusBar variant="desktop" />
-          <ChatArea
-            localVideoRef={(el) => (localVideoRef = el)}
-            remoteVideoRef={(el) => (remoteVideoRef = el)}
+      <ConnectionProvider value={connectionContextValue}>
+        <div class="min-h-screen bg-black text-white font-mono overflow-x-hidden">
+          {/* Mobile help button */}
+          <IconButton
+            onClick={() => appStore.setHelpDialogOpen(true)}
+            icon={<FiHelpCircle size={36} />}
+            class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
           />
+
+          <div class="container max-w-full mx-0 px-1 py-2">
+            {props.children}
+          </div>
+
+          {/* Hidden canvas for video processing */}
+          <canvas ref={(el) => (canvasRef = el)} class="hidden" />
+
+          {/* Dialogs */}
+          <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
+          <HelpDialog />
         </div>
-
-        {/* Hidden canvas for video processing */}
-        <canvas ref={(el) => (canvasRef = el)} class="hidden" />
-
-        {/* Dialogs */}
-        <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
-        <HelpDialog />
-      </div>
+      </ConnectionProvider>
     </Suspense>
   );
 }

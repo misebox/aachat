@@ -27,7 +27,9 @@ const [helpDialogOpen, setHelpDialogOpen] = createSignal(false);
 // Keyword state
 const [isKeywordFromURL, setIsKeywordFromURL] = createSignal(false);
 const [keywordLocked, setKeywordLocked] = createSignal(false);
-const [isDirectMode, setIsDirectMode] = createSignal(false);
+
+// Camera state
+const [cameraReady, setCameraReady] = createSignal(false);
 
 // Computed: is connected
 const isConnected = () => connectionState() === 'connected';
@@ -76,8 +78,10 @@ export const appStore = {
   setIsKeywordFromURL,
   keywordLocked,
   setKeywordLocked,
-  isDirectMode,
-  setIsDirectMode,
+
+  // Camera state
+  cameraReady,
+  setCameraReady,
 
   // Computed
   isConnected,
