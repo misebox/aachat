@@ -1,4 +1,4 @@
-import { onMount } from 'solid-js';
+import { onMount, onCleanup } from 'solid-js';
 import { useSearchParams, useNavigate } from '@solidjs/router';
 import { FiSettings, FiHelpCircle, FiShare2 } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
@@ -19,11 +19,16 @@ export const HomePage = () => {
   const connection = useConnectionContext();
 
   onMount(() => {
+    appStore.setVideoAreaCount(1);
     const keyword = searchParams.k;
     if (keyword) {
       appStore.setKeyword(keyword);
       appStore.setIsKeywordFromURL(true);
     }
+  });
+
+  onCleanup(() => {
+    appStore.setVideoAreaCount(2);
   });
 
   const handleEnter = () => {

@@ -18,11 +18,11 @@ export const AsciiDisplay: Component<AsciiDisplayProps> = (props) => {
       class="aa-display bg-black border border-gray-700 rounded-sm p-0 m-0 mx-auto font-mono font-normal text-white whitespace-pre overflow-hidden leading-none block box-border"
       style={{
         'font-size': fontSizeVar(),
+        'line-height': '1em',
         'letter-spacing': `calc(${fontSizeVar()} * 0.4)`,
         width: `calc(${AA_WIDTH} * ${fontSizeVar()} * 0.6 + ${AA_WIDTH - 1} * ${fontSizeVar()} * 0.4)`,
-        height: `calc(${AA_HEIGHT} * ${fontSizeVar()})`,
+        height: `calc(${AA_HEIGHT} * 1em)`,
         'max-width': '100%',
-        'max-height': '100%',
       }}
     >
       {props.content}

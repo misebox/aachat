@@ -32,6 +32,9 @@ const [keywordLocked, setKeywordLocked] = createSignal(false);
 // Camera state
 const [cameraReady, setCameraReady] = createSignal(false);
 
+// Layout
+const [videoAreaCount, setVideoAreaCount] = createSignal(2);
+
 // Computed: is connected
 const isConnected = () => connectionState() === 'connected';
 const isConnecting = () => connectionState() === 'connecting';
@@ -85,6 +88,10 @@ export const appStore = {
   // Camera state
   cameraReady,
   setCameraReady,
+
+  // Layout
+  videoAreaCount,
+  setVideoAreaCount,
 
   // Computed
   isConnected,

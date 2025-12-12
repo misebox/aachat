@@ -13,7 +13,7 @@ export const ChatArea: Component<ChatAreaProps> = (props) => {
   const showRemote = () => props.showRemote !== false;
 
   return (
-    <div class="chat-area flex flex-col md:flex-row items-center justify-center gap-0 md:gap-5 mx-0 md:mx-1 px-0.5 md:px-0 h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] overflow-hidden md:overflow-y-auto overscroll-none bg-neutral-900 md:bg-transparent">
+    <div class="chat-area flex flex-col md:flex-row items-center justify-center gap-0 md:gap-5 mx-0 md:mx-1 px-0.5 md:px-0 h-[calc(var(--actual-vh,100vh)-100px)] md:h-[calc(100vh-120px)] overflow-hidden md:overflow-y-auto overscroll-none bg-neutral-900 md:bg-transparent">
       <Show when={showRemote()}>
         <VideoContainer
           title="Peer"

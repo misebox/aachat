@@ -140,6 +140,12 @@ export default function App(props: ParentProps) {
     }
   });
 
+  // Recalculate font size when video area count changes
+  createEffect(() => {
+    appStore.videoAreaCount();
+    ui.adjustAAFontSize();
+  });
+
   onCleanup(() => {
     if (timerInterval) {
       clearInterval(timerInterval);
