@@ -1,10 +1,12 @@
 import { onMount, createEffect, on, Show } from 'solid-js';
 import { useParams } from '@solidjs/router';
+import { FiSettings, FiShare2 } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
   StatusBar,
   ChatArea,
+  IconButton,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
@@ -78,6 +80,16 @@ export const DirectPage = () => {
             Leave
           </Button>
         </Show>
+
+        <IconButton
+          onClick={() => appStore.setShareDialogOpen(true)}
+          icon={<FiShare2 size={36} />}
+        />
+
+        <IconButton
+          onClick={() => appStore.setDeviceDialogOpen(true)}
+          icon={<FiSettings size={36} />}
+        />
       </div>
       <StatusBar variant="desktop" />
       <ChatArea
