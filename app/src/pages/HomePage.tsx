@@ -87,7 +87,7 @@ export const HomePage = () => {
       <StatusBar variant="desktop" />
       <ChatArea
         localVideoRef={connection.setLocalVideoRef}
-        remoteVideoRef={connection.setRemoteVideoRef}
+        showRemote={false}
       />
     </>
   );
