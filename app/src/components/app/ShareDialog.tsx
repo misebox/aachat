@@ -82,34 +82,33 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
             {/* URL */}
             <div class="w-full">
               <p class="text-xs text-gray-400 mb-1">URL</p>
-              <div class="flex flex-col gap-2">
-                <div class="bg-neutral-800 border border-gray-600 rounded px-2 py-2 text-sm text-white break-all">
-                  {directUrl()}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopy}
-                  class="border-gray-600 text-white hover:bg-gray-800 self-end flex items-center gap-1"
-                >
-                  <Show when={copied()} fallback={<><FiCopy size={16} /> Copy</>}>
-                    <FiCheck size={16} /> Copied
-                  </Show>
-                </Button>
+              <div class="bg-neutral-800 border border-gray-600 rounded px-2 py-2 text-sm text-white break-all">
+                {directUrl()}
               </div>
             </div>
 
-            {/* Share button */}
-            <Show when={canShare()}>
+            {/* Copy and Share buttons */}
+            <div class="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={handleShare}
+                onClick={handleCopy}
                 class="border-gray-600 text-white hover:bg-gray-800 flex items-center gap-2"
               >
-                <FiShare2 size={20} />
-                Share
+                <Show when={copied()} fallback={<><FiCopy size={20} /> Copy</>}>
+                  <FiCheck size={20} /> Copied
+                </Show>
               </Button>
-            </Show>
+              <Show when={canShare()}>
+                <Button
+                  variant="outline"
+                  onClick={handleShare}
+                  class="border-gray-600 text-white hover:bg-gray-800 flex items-center gap-2"
+                >
+                  <FiShare2 size={20} />
+                  Share
+                </Button>
+              </Show>
+            </div>
           </div>
         </Show>
       </DialogContent>
