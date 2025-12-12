@@ -7,5 +7,6 @@ export { ChatArea } from './ChatArea';
 export { DeviceDialog } from './DeviceDialog';
 export { DeviceSelector } from './DeviceSelector';
 export { HelpDialog } from './HelpDialog';
+export { ShareDialog } from './ShareDialog';
 export { KeywordInput } from './KeywordInput';
 export { IconButton } from './IconButton';

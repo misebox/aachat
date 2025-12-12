@@ -23,11 +23,14 @@ const [remoteAscii, setRemoteAscii] = createSignal('');
 // Dialogs
 const [deviceDialogOpen, setDeviceDialogOpen] = createSignal(false);
 const [helpDialogOpen, setHelpDialogOpen] = createSignal(false);
+const [shareDialogOpen, setShareDialogOpen] = createSignal(false);
 
 // Keyword state
 const [isKeywordFromURL, setIsKeywordFromURL] = createSignal(false);
 const [keywordLocked, setKeywordLocked] = createSignal(false);
-const [isDirectMode, setIsDirectMode] = createSignal(false);
+
+// Camera state
+const [cameraReady, setCameraReady] = createSignal(false);
 
 // Computed: is connected
 const isConnected = () => connectionState() === 'connected';
@@ -70,14 +73,18 @@ export const appStore = {
   setDeviceDialogOpen,
   helpDialogOpen,
   setHelpDialogOpen,
+  shareDialogOpen,
+  setShareDialogOpen,
 
   // Keyword state
   isKeywordFromURL,
   setIsKeywordFromURL,
   keywordLocked,
   setKeywordLocked,
-  isDirectMode,
-  setIsDirectMode,
+
+  // Camera state
+  cameraReady,
+  setCameraReady,
 
   // Computed
   isConnected,

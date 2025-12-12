@@ -27,6 +27,7 @@ export const ICE_GATHERING_TIMEOUT = 3000;
 export const RETRY_DELAY = 1000;
 export const CONNECT_MAX_RETRIES = 3;
 export const KEYWORD_TIMER_MAX = 10 * 60 * 1000; // 10 minutes
+export const MAX_DIRECT_CONNECT_RETRIES = 5; // Auto-retry limit for /direct/:keyword
 
 // Session states
 export const SessionState = {

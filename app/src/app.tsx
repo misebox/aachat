@@ -1,21 +1,15 @@
-import { Suspense, onMount, onCleanup, createEffect } from 'solid-js';
+import { Suspense, onMount, onCleanup, createEffect, ParentProps } from 'solid-js';
 import { FiHelpCircle } from 'solid-icons/fi';
 
 import './app.css';
-import {
-  Header,
-  ConnectionControls,
-  StatusBar,
-  ChatArea,
-  DeviceDialog,
-  HelpDialog,
-  IconButton,
-} from '@/components/app';
+import { DeviceDialog, HelpDialog, ShareDialog, IconButton } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnection, useUI } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
+import { loadSettings, saveSettings } from '@/lib/settings';
+import { ConnectionProvider } from '@/context/connection';
 
-export default function App() {
+export default function App(props: ParentProps) {
   let localVideoRef: HTMLVideoElement | undefined;
   let remoteVideoRef: HTMLVideoElement | undefined;
   let canvasRef: HTMLCanvasElement | undefined;
@@ -24,22 +18,31 @@ export default function App() {
 
   const connection = useConnection({
     onStatusChange: (status) => {
-      appStore.setStatusText(status);
+      // Only update status if still connecting or connected
+      if (appStore.isConnecting() || appStore.isConnected()) {
+        appStore.setStatusText(status);
+      }
     },
     onConnected: () => {
-      appStore.setConnectionState('connected');
+      // Only transition to connected if still connecting
+      if (appStore.isConnecting()) {
+        appStore.setConnectionState('connected');
+      }
     },
     onDisconnected: () => {
       appStore.setConnectionState('disconnected');
     },
     onError: (error) => {
       console.error('Connection error:', error);
-      appStore.setStatusText(error);
-      appStore.setConnectionState('error');
+      // Only handle error if still connecting or connected
+      if (appStore.isConnecting() || appStore.isConnected()) {
+        appStore.setStatusText(error);
+        appStore.setConnectionState('error');
+      }
     },
   });
 
-  // Initialize canvas, setup UI, and load URL parameters
+  // Initialize canvas, setup UI, and start camera
   onMount(async () => {
     document.title = APP_TITLE;
 
@@ -48,33 +51,26 @@ export default function App() {
     }
     ui.setupResizeListeners();
 
-    // Check for /direct/{keyword} path for auto-connect
-    const pathname = window.location.pathname;
-    const directMatch = pathname.match(/^\/direct\/(.+)$/);
-    let autoConnect = false;
+    // Load saved settings
+    const settings = loadSettings();
 
-    if (directMatch) {
-      const keyword = decodeURIComponent(directMatch[1]);
-      appStore.setKeyword(keyword);
-      appStore.setIsKeywordFromURL(true);
-      appStore.setIsDirectMode(true);
-      autoConnect = true;
-    } else {
-      // Load keyword from URL (?k=keyword)
-      const urlParams = new URLSearchParams(window.location.search);
-      const keyword = urlParams.get('k');
-      if (keyword) {
-        appStore.setKeyword(keyword);
-        appStore.setIsKeywordFromURL(true);
-      }
-    }
+    // Start camera with saved device preferences
+    await connection.media.startCamera(settings.selectedVideoDevice, settings.selectedAudioDevice);
+    appStore.setCameraReady(true);
 
-    // Start camera on app load
-    await connection.media.startCamera();
+    // Validate and apply saved device settings
+    const videoDevices = connection.media.videoDevices();
+    const audioDevices = connection.media.audioDevices();
 
-    // Auto-connect if accessed via /direct/{keyword}
-    if (autoConnect) {
-      handleConnect();
+    const validVideo = videoDevices.some(d => d.deviceId === settings.selectedVideoDevice);
+    const validAudio = audioDevices.some(d => d.deviceId === settings.selectedAudioDevice);
+
+    // Clear invalid settings
+    if (!validVideo || !validAudio) {
+      saveSettings({
+        selectedVideoDevice: validVideo ? settings.selectedVideoDevice : '',
+        selectedAudioDevice: validAudio ? settings.selectedAudioDevice : '',
+      });
     }
   });
 
@@ -204,35 +200,50 @@ export default function App() {
       await connection.media.switchDevice('audio', audioDeviceId, pc || undefined);
       appStore.setSelectedAudioDevice(audioDeviceId);
     }
+
+    // Save to localStorage
+    saveSettings({
+      selectedVideoDevice: videoDeviceId,
+      selectedAudioDevice: audioDeviceId,
+    });
+  };
+
+  const connectionContextValue = {
+    connect: handleConnect,
+    disconnect: handleLeave,
+    refreshDevices: handleRefreshDevices,
+    applyDevices: handleApplyDevices,
+    setLocalVideoRef: (el: HTMLVideoElement) => { localVideoRef = el; },
+    setRemoteVideoRef: (el: HTMLVideoElement) => { remoteVideoRef = el; },
   };
 
   return (
     <Suspense>
-      <div class="min-h-screen bg-black text-white font-mono overflow-x-hidden">
-        {/* Mobile help button */}
-        <IconButton
-          onClick={() => appStore.setHelpDialogOpen(true)}
-          icon={<FiHelpCircle size={36} />}
-          class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
-        />
+      <ConnectionProvider value={connectionContextValue}>
+        <div class="min-h-screen bg-black text-white font-mono overflow-x-hidden">
+          {/* Mobile help button */}
+          <IconButton
+            onClick={() => appStore.setHelpDialogOpen(true)}
+            icon={<FiHelpCircle size={36} />}
+            class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
+          />
 
-        <div class="container max-w-full mx-0 px-1 py-2">
-          <Header />
-          <ConnectionControls onConnect={handleConnect} onLeave={handleLeave} />
-          <StatusBar variant="desktop" />
-          <ChatArea
-            localVideoRef={(el) => (localVideoRef = el)}
-            remoteVideoRef={(el) => (remoteVideoRef = el)}
+          <div class="container max-w-full mx-0 px-1 py-2">
+            {props.children}
+          </div>
+
+          {/* Hidden canvas for video processing */}
+          <canvas ref={(el) => (canvasRef = el)} class="hidden" />
+
+          {/* Dialogs */}
+          <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
+          <HelpDialog />
+          <ShareDialog
+            open={appStore.shareDialogOpen()}
+            onOpenChange={appStore.setShareDialogOpen}
           />
         </div>
-
-        {/* Hidden canvas for video processing */}
-        <canvas ref={(el) => (canvasRef = el)} class="hidden" />
-
-        {/* Dialogs */}
-        <DeviceDialog onRefresh={handleRefreshDevices} onApply={handleApplyDevices} />
-        <HelpDialog />
-      </div>
+      </ConnectionProvider>
     </Suspense>
   );
 }
