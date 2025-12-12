@@ -31,6 +31,14 @@ export default function App(props: ParentProps) {
     },
     onDisconnected: () => {
       appStore.setConnectionState('disconnected');
+      appStore.setRemoteAscii('');
+    },
+    onPeerLeft: async () => {
+      appStore.setConnectionState('idle');
+      appStore.setStatusText('Call ended');
+      appStore.setRemoteAscii('');
+      // Restart camera after peer left
+      await connection.media.startCamera();
     },
     onError: (error) => {
       console.error('Connection error:', error);
@@ -91,9 +99,15 @@ export default function App(props: ParentProps) {
   createEffect(() => {
     const stream = connection.remoteStream();
     const remoteVideo = remoteVideoRef();
-    if (remoteVideo && stream) {
-      remoteVideo.srcObject = stream;
-      remoteVideo.play().catch(() => {});
+    if (remoteVideo) {
+      if (stream) {
+        remoteVideo.srcObject = stream;
+        remoteVideo.play().catch(() => {});
+      } else {
+        // Clear when stream is null (peer disconnected)
+        remoteVideo.srcObject = null;
+        appStore.setRemoteAscii('');
+      }
     }
   });
 
@@ -183,14 +197,10 @@ export default function App(props: ParentProps) {
     }
   };
 
-  const handleLeave = async () => {
+  const handleLeave = () => {
+    // disconnect() will send leave message and wait for ack
+    // onPeerLeft callback will handle the cleanup
     connection.disconnect();
-    appStore.setConnectionState('idle');
-    appStore.setStatusText('');
-    appStore.setLocalAscii('');
-    appStore.setRemoteAscii('');
-    // Restart camera after disconnect
-    await connection.media.startCamera();
   };
 
   const handleRefreshDevices = async () => {
