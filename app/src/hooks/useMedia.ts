@@ -147,6 +147,30 @@ export function useMedia() {
   }
 
   /**
+   * Toggle video track enabled state
+   */
+  function setVideoEnabled(enabled: boolean): void {
+    const stream = localStream();
+    if (stream) {
+      stream.getVideoTracks().forEach((track) => {
+        track.enabled = enabled;
+      });
+    }
+  }
+
+  /**
+   * Toggle audio track enabled state
+   */
+  function setAudioEnabled(enabled: boolean): void {
+    const stream = localStream();
+    if (stream) {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = enabled;
+      });
+    }
+  }
+
+  /**
    * Switch device during active call
    */
   async function switchDevice(
@@ -216,5 +240,7 @@ export function useMedia() {
     startCamera,
     stopCamera,
     switchDevice,
+    setVideoEnabled,
+    setAudioEnabled,
   };
 }

@@ -214,6 +214,18 @@ export default function App(props: ParentProps) {
     });
   };
 
+  const handleToggleVideo = () => {
+    const newState = !appStore.videoEnabled();
+    appStore.setVideoEnabled(newState);
+    connection.media.setVideoEnabled(newState);
+  };
+
+  const handleToggleAudio = () => {
+    const newState = !appStore.audioEnabled();
+    appStore.setAudioEnabled(newState);
+    connection.media.setAudioEnabled(newState);
+  };
+
   const connectionContextValue = {
     connect: handleConnect,
     disconnect: handleLeave,
@@ -221,6 +233,8 @@ export default function App(props: ParentProps) {
     applyDevices: handleApplyDevices,
     setLocalVideoRef: (el: HTMLVideoElement) => { localVideoRef = el; },
     setRemoteVideoRef: (el: HTMLVideoElement) => { remoteVideoRef = el; },
+    toggleVideo: handleToggleVideo,
+    toggleAudio: handleToggleAudio,
   };
 
   return (

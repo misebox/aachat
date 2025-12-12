@@ -32,6 +32,10 @@ const [keywordLocked, setKeywordLocked] = createSignal(false);
 // Camera state
 const [cameraReady, setCameraReady] = createSignal(false);
 
+// Media controls
+const [videoEnabled, setVideoEnabled] = createSignal(true);
+const [audioEnabled, setAudioEnabled] = createSignal(true);
+
 // Layout
 const [videoAreaCount, setVideoAreaCount] = createSignal(2);
 
@@ -88,6 +92,12 @@ export const appStore = {
   // Camera state
   cameraReady,
   setCameraReady,
+
+  // Media controls
+  videoEnabled,
+  setVideoEnabled,
+  audioEnabled,
+  setAudioEnabled,
 
   // Layout
   videoAreaCount,
