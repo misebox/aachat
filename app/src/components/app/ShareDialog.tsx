@@ -1,10 +1,10 @@
-import { Component, Show, createMemo } from 'solid-js';
+import { Component, Show, createMemo, createEffect, createSignal } from 'solid-js';
 import { FiShare2, FiCopy, FiCheck } from 'solid-icons/fi';
+import QRCode from 'qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { appStore } from '@/store/app';
 import { APP_TITLE } from '@/lib/constants';
-import { createSignal } from 'solid-js';
 
 interface ShareDialogProps {
   open: boolean;
@@ -13,6 +13,7 @@ interface ShareDialogProps {
 
 export const ShareDialog: Component<ShareDialogProps> = (props) => {
   const [copied, setCopied] = createSignal(false);
+  const [qrDataUrl, setQrDataUrl] = createSignal('');
 
   const directUrl = createMemo(() => {
     const keyword = appStore.keyword().trim();
@@ -21,10 +22,16 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
     return `${base}/direct/${encodeURIComponent(keyword)}`;
   });
 
-  const qrCodeUrl = createMemo(() => {
+  // Generate QR code locally
+  createEffect(() => {
     const url = directUrl();
-    if (!url) return '';
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+    if (!url) {
+      setQrDataUrl('');
+      return;
+    }
+    QRCode.toDataURL(url, { width: 200, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(''));
   });
 
   const handleCopy = async () => {
@@ -66,28 +73,27 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
         <Show when={directUrl()} fallback={<p class="text-gray-400">Enter a keyword first</p>}>
           <div class="flex flex-col items-center gap-4">
             {/* QR Code */}
-            <div class="bg-white p-2 rounded">
-              <img src={qrCodeUrl()} alt="QR Code" width={200} height={200} />
-            </div>
+            <Show when={qrDataUrl()}>
+              <div class="bg-white p-2 rounded">
+                <img src={qrDataUrl()} alt="QR Code" width={200} height={200} />
+              </div>
+            </Show>
 
             {/* URL */}
             <div class="w-full">
               <p class="text-xs text-gray-400 mb-1">URL</p>
-              <div class="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={directUrl()}
-                  readonly
-                  class="flex-1 bg-neutral-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
-                />
+              <div class="flex flex-col gap-2">
+                <div class="bg-neutral-800 border border-gray-600 rounded px-2 py-2 text-sm text-white break-all">
+                  {directUrl()}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleCopy}
-                  class="border-gray-600 text-white hover:bg-gray-800"
+                  class="border-gray-600 text-white hover:bg-gray-800 self-end flex items-center gap-1"
                 >
-                  <Show when={copied()} fallback={<FiCopy size={16} />}>
-                    <FiCheck size={16} />
+                  <Show when={copied()} fallback={<><FiCopy size={16} /> Copy</>}>
+                    <FiCheck size={16} /> Copied
                   </Show>
                 </Button>
               </div>
