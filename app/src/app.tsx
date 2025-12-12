@@ -17,18 +17,27 @@ export default function App(props: ParentProps) {
 
   const connection = useConnection({
     onStatusChange: (status) => {
-      appStore.setStatusText(status);
+      // Only update status if still connecting or connected
+      if (appStore.isConnecting() || appStore.isConnected()) {
+        appStore.setStatusText(status);
+      }
     },
     onConnected: () => {
-      appStore.setConnectionState('connected');
+      // Only transition to connected if still connecting
+      if (appStore.isConnecting()) {
+        appStore.setConnectionState('connected');
+      }
     },
     onDisconnected: () => {
       appStore.setConnectionState('disconnected');
     },
     onError: (error) => {
       console.error('Connection error:', error);
-      appStore.setStatusText(error);
-      appStore.setConnectionState('error');
+      // Only handle error if still connecting or connected
+      if (appStore.isConnecting() || appStore.isConnected()) {
+        appStore.setStatusText(error);
+        appStore.setConnectionState('error');
+      }
     },
   });
 

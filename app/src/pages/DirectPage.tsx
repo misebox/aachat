@@ -1,4 +1,4 @@
-import { onMount, createEffect, on } from 'solid-js';
+import { onMount, createEffect, on, Show } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,10 +8,12 @@ import {
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
+import { MAX_DIRECT_CONNECT_RETRIES } from '@/lib/constants';
 
 export const DirectPage = () => {
   const params = useParams<{ keyword: string }>();
   const connection = useConnectionContext();
+  let retryCount = 0;
 
   onMount(() => {
     const keyword = decodeURIComponent(params.keyword);
@@ -22,14 +24,29 @@ export const DirectPage = () => {
   // Auto-connect when camera is ready
   createEffect(on(appStore.cameraReady, (ready) => {
     if (ready && appStore.isIdle()) {
+      retryCount = 0;
       connection.connect();
+    }
+  }));
+
+  // Reset retry count on successful connection
+  createEffect(on(appStore.connectionState, (state) => {
+    if (state === 'connected') {
+      retryCount = 0;
     }
   }));
 
   // Auto-retry on error (e.g., ICE exchange failed)
   createEffect(on(appStore.connectionState, (state) => {
     if (state === 'error' && appStore.cameraReady()) {
-      // Reset to idle and retry after short delay
+      retryCount++;
+      if (retryCount >= MAX_DIRECT_CONNECT_RETRIES) {
+        // Stop retrying after max attempts
+        appStore.setConnectionState('idle');
+        appStore.setStatusText(`Connection failed after ${MAX_DIRECT_CONNECT_RETRIES} attempts`);
+        return;
+      }
+      // Retry after short delay
       setTimeout(() => {
         appStore.setConnectionState('idle');
         connection.connect();
