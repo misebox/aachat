@@ -6,6 +6,7 @@ import { DeviceDialog, HelpDialog, IconButton } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnection, useUI } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
+import { loadSettings, saveSettings } from '@/lib/settings';
 import { ConnectionProvider } from '@/context/connection';
 
 export default function App(props: ParentProps) {
@@ -50,9 +51,27 @@ export default function App(props: ParentProps) {
     }
     ui.setupResizeListeners();
 
-    // Start camera on app load
-    await connection.media.startCamera();
+    // Load saved settings
+    const settings = loadSettings();
+
+    // Start camera with saved device preferences
+    await connection.media.startCamera(settings.selectedVideoDevice, settings.selectedAudioDevice);
     appStore.setCameraReady(true);
+
+    // Validate and apply saved device settings
+    const videoDevices = connection.media.videoDevices();
+    const audioDevices = connection.media.audioDevices();
+
+    const validVideo = videoDevices.some(d => d.deviceId === settings.selectedVideoDevice);
+    const validAudio = audioDevices.some(d => d.deviceId === settings.selectedAudioDevice);
+
+    // Clear invalid settings
+    if (!validVideo || !validAudio) {
+      saveSettings({
+        selectedVideoDevice: validVideo ? settings.selectedVideoDevice : '',
+        selectedAudioDevice: validAudio ? settings.selectedAudioDevice : '',
+      });
+    }
   });
 
   // Sync local stream to video element and start ASCII conversion
@@ -181,6 +200,12 @@ export default function App(props: ParentProps) {
       await connection.media.switchDevice('audio', audioDeviceId, pc || undefined);
       appStore.setSelectedAudioDevice(audioDeviceId);
     }
+
+    // Save to localStorage
+    saveSettings({
+      selectedVideoDevice: videoDeviceId,
+      selectedAudioDevice: audioDeviceId,
+    });
   };
 
   const connectionContextValue = {
