@@ -1,4 +1,4 @@
-import { Suspense, onMount, onCleanup, createEffect, ParentProps } from 'solid-js';
+import { Suspense, onMount, onCleanup, createEffect, createSignal, ParentProps } from 'solid-js';
 import { FiHelpCircle } from 'solid-icons/fi';
 
 import './app.css';
@@ -10,8 +10,8 @@ import { loadSettings, saveSettings } from '@/lib/settings';
 import { ConnectionProvider } from '@/context/connection';
 
 export default function App(props: ParentProps) {
-  let localVideoRef: HTMLVideoElement | undefined;
-  let remoteVideoRef: HTMLVideoElement | undefined;
+  const [localVideoRef, setLocalVideoRef] = createSignal<HTMLVideoElement | undefined>();
+  const [remoteVideoRef, setRemoteVideoRef] = createSignal<HTMLVideoElement | undefined>();
   let canvasRef: HTMLCanvasElement | undefined;
 
   const ui = useUI();
@@ -77,20 +77,23 @@ export default function App(props: ParentProps) {
   // Sync local stream to video element and start ASCII conversion
   createEffect(() => {
     const stream = connection.media.localStream();
-    if (localVideoRef && stream) {
-      localVideoRef.srcObject = stream;
-      localVideoRef.play().catch(() => {});
+    const localVideo = localVideoRef();
+    const remoteVideo = remoteVideoRef();
+    if (localVideo && stream) {
+      localVideo.srcObject = stream;
+      localVideo.play().catch(() => {});
       // Start ASCII conversion for local video
-      connection.ascii.startConversion(localVideoRef, remoteVideoRef);
+      connection.ascii.startConversion(localVideo, remoteVideo);
     }
   });
 
   // Sync remote stream to video element
   createEffect(() => {
     const stream = connection.remoteStream();
-    if (remoteVideoRef && stream) {
-      remoteVideoRef.srcObject = stream;
-      remoteVideoRef.play().catch(() => {});
+    const remoteVideo = remoteVideoRef();
+    if (remoteVideo && stream) {
+      remoteVideo.srcObject = stream;
+      remoteVideo.play().catch(() => {});
     }
   });
 
@@ -231,8 +234,8 @@ export default function App(props: ParentProps) {
     disconnect: handleLeave,
     refreshDevices: handleRefreshDevices,
     applyDevices: handleApplyDevices,
-    setLocalVideoRef: (el: HTMLVideoElement) => { localVideoRef = el; },
-    setRemoteVideoRef: (el: HTMLVideoElement) => { remoteVideoRef = el; },
+    setLocalVideoRef,
+    setRemoteVideoRef,
     toggleVideo: handleToggleVideo,
     toggleAudio: handleToggleAudio,
   };
