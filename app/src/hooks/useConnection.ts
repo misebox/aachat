@@ -37,6 +37,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
   const [remoteStream, setRemoteStream] = createSignal<MediaStream | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = createSignal(0);
+  const [isLeaving, setIsLeaving] = createSignal(false);
   const maxReconnectAttempts = 3;
 
   let keywordTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,6 +79,11 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     onDisconnected: () => {
       // Clear remote stream immediately when peer disconnects
       setRemoteStream(null);
+
+      // Don't reconnect if we initiated the leave
+      if (isLeaving()) {
+        return;
+      }
 
       if (session.connectionEstablished()) {
         const keyword = session.currentKeyword();
@@ -557,6 +563,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     session.reset();
     setRemoteStream(null);
     setReconnectAttempts(0);
+    setIsLeaving(false);
   }
 
   /**
@@ -564,6 +571,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
    */
   function disconnect(): void {
     logger.log('Disconnect requested');
+    setIsLeaving(true);
 
     // Try to send leave message to peer
     const sent = webrtc.sendMessage({ type: 'leave' });
@@ -583,7 +591,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
       // DataChannel not available, cleanup immediately
       session.endSession();
       cleanup();
-      callbacks.onStatusChange?.('Disconnected');
+      callbacks.onPeerLeft?.();
     }
   }
 

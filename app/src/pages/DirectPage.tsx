@@ -23,6 +23,11 @@ export const DirectPage = () => {
     navigate('/');
   };
 
+  const handleConnect = () => {
+    retryCount = 0;
+    connection.connect();
+  };
+
   onMount(() => {
     const keyword = decodeURIComponent(params.keyword);
     appStore.setKeyword(keyword);
@@ -86,7 +91,7 @@ export const DirectPage = () => {
           fallback={
             <Button
               variant="outline"
-              onClick={connection.connect}
+              onClick={handleConnect}
               class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
             >
               Connect
