@@ -69,10 +69,7 @@ export const DirectPage = () => {
 
   return (
     <>
-      <Header onNavigateHome={handleNavigateHome} />
-      <div class="fixed top-1 left-1 z-[100] bg-black/80 px-2 py-1 rounded text-white text-sm font-mono">
-        {appStore.keyword()}
-      </div>
+      <Header onNavigateHome={handleNavigateHome} subtitle={appStore.keyword()} />
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
           onClick={connection.toggleVideo}
