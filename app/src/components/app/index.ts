@@ -1,5 +1,4 @@
 export { Header } from './Header';
-export { ConnectionControls } from './ConnectionControls';
 export { StatusBar } from './StatusBar';
 export { AsciiDisplay } from './AsciiDisplay';
 export { VideoContainer } from './VideoContainer';
