@@ -4,6 +4,7 @@ import { appStore } from '@/store/app';
 interface KeywordInputProps {
   value: string;
   onInput: (value: string) => void;
+  onEnter: () => void;
   placeholder?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -39,12 +40,20 @@ export const KeywordInput: Component<KeywordInputProps> = (props) => {
     applyValue(e.target as HTMLInputElement);
   };
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !isComposing) {
+      e.preventDefault();
+      props.onEnter();
+    }
+  };
+
   return (
     <input
       type="text"
       inputmode="latin"
       value={props.value}
       onInput={handleInput}
+      onKeyDown={handleKeyDown}
       onCompositionStart={handleCompositionStart}
       onCompositionEnd={handleCompositionEnd}
       placeholder={props.placeholder ?? 'keyword'}

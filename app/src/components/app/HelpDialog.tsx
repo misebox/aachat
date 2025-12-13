@@ -21,7 +21,7 @@ export const HelpDialog: Component = () => {
           <section>
             <h4 class="text-white font-medium mb-2">How to Use</h4>
             <ol class="list-decimal list-inside space-y-2 text-gray-300">
-              <li>Enter a keyword and press Enter (or click Connect)</li>
+              <li>Enter a keyword and click Enter to join the room</li>
               <li>Share the URL with your peer</li>
               <li>Anyone with the same URL can join the call</li>
               <li>Click Leave to end the call</li>

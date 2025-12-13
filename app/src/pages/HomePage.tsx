@@ -91,6 +91,7 @@ export const HomePage = () => {
         <KeywordInput
           value={appStore.keyword()}
           onInput={appStore.setKeyword}
+          onEnter={handleEnter}
           readonly={appStore.isKeywordFromURL()}
         />
 
