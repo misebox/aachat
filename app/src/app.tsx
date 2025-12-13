@@ -206,10 +206,10 @@ export default function App(props: ParentProps) {
     }
   };
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     // disconnect() will send leave message and wait for ack
     // onPeerLeft callback will handle the cleanup
-    connection.disconnect();
+    await connection.disconnect();
   };
 
   const handleRefreshDevices = async () => {

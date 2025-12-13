@@ -78,7 +78,7 @@ export const DirectPage = () => {
 
   return (
     <>
-      <Header onNavigateHome={handleNavigateHome} subtitle={appStore.keyword()} />
+      <Header onNavigateHome={handleNavigateHome} subtitle={appStore.keyword()} onHelpClick={() => appStore.setHelpDialogOpen(true)} />
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
           onClick={connection.toggleVideo}

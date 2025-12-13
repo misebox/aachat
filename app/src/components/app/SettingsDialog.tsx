@@ -78,7 +78,7 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
         <div class="space-y-6 py-4">
           {/* Device Section */}
           <div class="space-y-3">
-            <h3 class="text-sm font-medium text-gray-400">Device</h3>
+            <h3 class="text-base uppercase tracking-wider text-gray-500">Device</h3>
             <DeviceSelector
               label="Video"
               value={tempVideoDevice()}
@@ -95,7 +95,7 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
 
           {/* Quality Section */}
           <div class="space-y-3">
-            <h3 class="text-sm font-medium text-gray-400">Quality</h3>
+            <h3 class="text-base uppercase tracking-wider text-gray-500">Quality</h3>
             <div class="space-y-1">
               <label class="text-sm text-gray-300">FPS</label>
               <div class="flex gap-2">

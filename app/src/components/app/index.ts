@@ -4,7 +4,7 @@ export { StatusBar } from './StatusBar';
 export { AsciiDisplay } from './AsciiDisplay';
 export { VideoContainer } from './VideoContainer';
 export { ChatArea } from './ChatArea';
-export { DeviceDialog } from './DeviceDialog';
+export { DeviceDialog } from './SettingsDialog';
 export { DeviceSelector } from './DeviceSelector';
 export { HelpDialog } from './HelpDialog';
 export { ShareDialog } from './ShareDialog';

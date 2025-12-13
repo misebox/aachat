@@ -1,6 +1,6 @@
 import { onMount, onCleanup, Show } from 'solid-js';
 import { useSearchParams, useNavigate } from '@solidjs/router';
-import { FiSettings, FiHelpCircle, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
+import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
@@ -57,7 +57,7 @@ export const HomePage = () => {
 
   return (
     <>
-      <Header onNavigateHome={() => window.location.href = '/'} />
+      <Header onNavigateHome={() => window.location.href = '/'} onHelpClick={() => appStore.setHelpDialogOpen(true)} />
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
@@ -83,12 +83,6 @@ export const HomePage = () => {
         <IconButton
           onClick={() => appStore.setDeviceDialogOpen(true)}
           icon={<FiSettings size={36} />}
-        />
-
-        <IconButton
-          onClick={() => appStore.setHelpDialogOpen(true)}
-          icon={<FiHelpCircle size={36} />}
-          class="hidden md:inline-flex"
         />
       </div>
 
