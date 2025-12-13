@@ -21,6 +21,7 @@ export interface ConnectionCallbacks {
   onConnected?: () => void;
   onDisconnected?: () => void;
   onPeerLeft?: () => void;
+  onPeerInitiatedLeave?: () => void;
   onError?: (error: string) => void;
   onTimerUpdate?: (remaining: string) => void;
   onConnectionTypeChange?: (type: string | null) => void;
@@ -100,17 +101,17 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     },
     onDataChannelMessage: (message) => {
       if (message.type === 'leave') {
-        // Peer wants to leave - send ack and end call
-        logger.rtc('Received leave request');
+        // Peer wants to leave - send ack and prepare for reconnection
+        logger.rtc('Received leave request from peer');
         webrtc.sendMessage({ type: 'leave-ack' });
         setRemoteStream(null);
-        cleanup();
-        callbacks.onPeerLeft?.();
+        cleanupForReconnect();
+        callbacks.onPeerInitiatedLeave?.();
       } else if (message.type === 'leave-ack') {
-        // Peer acknowledged our leave - end call
+        // Peer acknowledged our leave - end call, go to idle
         logger.rtc('Received leave ack');
         setRemoteStream(null);
-        cleanup();
+        cleanupForReconnect();
         callbacks.onPeerLeft?.();
       }
     },
@@ -551,6 +552,20 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
   }
 
   /**
+   * Cleanup for reconnection (keeps camera running)
+   */
+  function cleanupForReconnect(): void {
+    logger.log('Cleanup for reconnect');
+    clearKeywordTimer();
+    signaling.abort();
+    webrtc.close();
+    session.reset();
+    setRemoteStream(null);
+    setReconnectAttempts(0);
+    setIsLeaving(false);
+  }
+
+  /**
    * Cleanup all resources
    */
   function cleanup(): void {
@@ -583,14 +598,14 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
         if (session.connectionEstablished()) {
           logger.log('Leave ack timeout, force cleanup');
           setRemoteStream(null);
-          cleanup();
+          cleanupForReconnect();
           callbacks.onPeerLeft?.();
         }
       }, 1000);
     } else {
       // DataChannel not available, cleanup immediately
       session.endSession();
-      cleanup();
+      cleanupForReconnect();
       callbacks.onPeerLeft?.();
     }
   }

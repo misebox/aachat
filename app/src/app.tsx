@@ -33,12 +33,26 @@ export default function App(props: ParentProps) {
       appStore.setConnectionState('disconnected');
       appStore.setRemoteAscii('');
     },
-    onPeerLeft: async () => {
+    onPeerLeft: () => {
       appStore.setConnectionState('idle');
       appStore.setStatusText('Call ended');
       appStore.setRemoteAscii('');
-      // Restart camera after peer left
-      await connection.media.startCamera();
+    },
+    onPeerInitiatedLeave: async () => {
+      appStore.setRemoteAscii('');
+      appStore.setStatusText('Peer left. Reconnecting...');
+      appStore.setConnectionState('connecting');
+      // Auto-reconnect with current keyword
+      const keyword = appStore.keyword();
+      if (keyword) {
+        const success = await connection.connect(keyword);
+        if (!success && appStore.connectionState() !== 'connected') {
+          appStore.setConnectionState('idle');
+        }
+      } else {
+        appStore.setConnectionState('idle');
+        appStore.setStatusText('Call ended');
+      }
     },
     onError: (error) => {
       console.error('Connection error:', error);
