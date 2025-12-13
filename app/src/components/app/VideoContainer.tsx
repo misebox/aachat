@@ -18,7 +18,7 @@ export const VideoContainer: Component<VideoContainerProps> = (props) => {
       <h3 class="absolute top-1 left-1 z-10 bg-black/80 px-2 py-1 rounded text-white text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] m-0 md:relative md:top-auto md:left-auto md:bg-transparent md:mb-1">
         {props.title}
       </h3>
-      <div class="inline-flex items-start">
+      <div class="flex justify-center items-start">
         <AsciiDisplay
           content={props.asciiContent}
           width={AA_WIDTH}
