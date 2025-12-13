@@ -1,32 +1,51 @@
 import { Component, Accessor } from 'solid-js';
-import { AA_HEIGHT } from '@/lib/constants';
+import { AsciiDisplay } from './AsciiDisplay';
+import { ASCII_CHARS } from '@/lib/constants';
 
 interface AudioLevelIndicatorProps {
   level: Accessor<number>;
+  height: number;
   variant?: 'local' | 'remote';
 }
 
 export const AudioLevelIndicator: Component<AudioLevelIndicatorProps> = (props) => {
-  const variant = () => props.variant ?? 'local';
-  const fontSizeVar = () =>
-    variant() === 'remote' ? 'var(--remote-aa-font-size, 8px)' : 'var(--aa-font-size, 10px)';
+  // Generate ASCII content for the level meter
+  const generateContent = () => {
+    const level = props.level();
+    const height = props.height;
+    const charCount = ASCII_CHARS.length;
+
+    // Character index based on level (100% divided by character count)
+    // Level 0 → index 0, Level 100 → index charCount-1
+    const charIndex = Math.min(
+      charCount - 1,
+      Math.floor((level / 100) * charCount)
+    );
+    const filledChar = ASCII_CHARS[charIndex];
+
+    // Number of filled rows based on level
+    const filledRows = Math.round((level / 100) * height);
+
+    const rows: string[] = [];
+    // Build from top to bottom
+    for (let i = 0; i < height; i++) {
+      const rowFromBottom = height - 1 - i;
+      if (rowFromBottom < filledRows) {
+        rows.push(filledChar);
+      } else {
+        rows.push(ASCII_CHARS[0]); // Empty (space)
+      }
+    }
+    return rows.join('\n');
+  };
 
   return (
-    <div
-      class="audio-level-indicator flex flex-col-reverse w-1.5 bg-gray-800 rounded-sm overflow-hidden"
-      style={{ height: `calc(${AA_HEIGHT} * ${fontSizeVar()})` }}
-    >
-      <div
-        class="transition-all duration-75 ease-out w-full"
-        style={{
-          height: `${props.level()}%`,
-          'background': props.level() > 80
-            ? '#ef4444'
-            : props.level() > 50
-            ? '#eab308'
-            : '#22c55e',
-        }}
-      />
-    </div>
+    <AsciiDisplay
+      content={generateContent()}
+      width={1}
+      height={props.height}
+      variant={props.variant}
+      border={false}
+    />
   );
 };
