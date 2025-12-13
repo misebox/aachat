@@ -1,4 +1,4 @@
-import { onMount, onCleanup, Show } from 'solid-js';
+import { onMount, onCleanup } from 'solid-js';
 import { useSearchParams, useNavigate, useLocation } from '@solidjs/router';
 import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
@@ -72,18 +72,16 @@ export const HomePage = () => {
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
-          onClick={handleToggleCamera}
-          icon={appStore.cameraReady() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
-          class={appStore.cameraReady() ? '' : 'text-red-500'}
+          onClick={connection.toggleVideo}
+          icon={appStore.videoEnabled() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
+          class={appStore.videoEnabled() ? '' : 'text-red-500'}
         />
 
-        <Show when={appStore.cameraReady()}>
-          <IconButton
-            onClick={connection.toggleAudio}
-            icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
-            class={appStore.audioEnabled() ? '' : 'text-red-500'}
-          />
-        </Show>
+        <IconButton
+          onClick={connection.toggleAudio}
+          icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
+          class={appStore.audioEnabled() ? '' : 'text-red-500'}
+        />
 
         <IconButton
           onClick={() => appStore.setShareDialogOpen(true)}
@@ -134,7 +132,7 @@ export const HomePage = () => {
       {/* Main content area - flex to push content down */}
       <div class="flex flex-col justify-around gap-8 mt-10">
         {/* Tagline - above video area */}
-        <div class="text-center py-2 text-gray-400 text-sm">
+        <div class="text-left px-4 py-2 text-gray-400 text-sm">
           <Typewriter
             class="text-base"
             text={descriptionTagline}
@@ -142,14 +140,24 @@ export const HomePage = () => {
           />
         </div>
 
-        <VideoContainer
-          title="You"
-          asciiContent={appStore.localAscii()}
-          audioLevel={appStore.localAudioLevel}
-          fontSize="var(--aa-font-size, 10px)"
-          muted={true}
-          videoRef={connection.setLocalVideoRef}
-        />
+        <div class="flex flex-col items-center gap-4">
+          <VideoContainer
+            title="You"
+            asciiContent={appStore.localAscii()}
+            audioLevel={appStore.localAudioLevel}
+            fontSize="var(--aa-font-size, 10px)"
+            muted={true}
+            videoRef={connection.setLocalVideoRef}
+          />
+
+          <Button
+            variant="outline"
+            onClick={handleToggleCamera}
+            class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
+          >
+            {appStore.cameraReady() ? 'Stop Test' : 'Test Device'}
+          </Button>
+        </div>
       </div>
     </div>
   );
