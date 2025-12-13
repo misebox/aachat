@@ -150,11 +150,11 @@ export default function App(props: ParentProps) {
   });
 
   // Timer for elapsed time
-  let timerInterval: number | undefined;
+  let timerInterval: ReturnType<typeof setInterval> | undefined;
 
   createEffect(() => {
     if (connection.session.connectionEstablished()) {
-      timerInterval = window.setInterval(() => {
+      timerInterval = setInterval(() => {
         appStore.setElapsedTime(connection.session.getSessionDuration());
       }, 1000);
     } else {
@@ -307,6 +307,7 @@ export default function App(props: ParentProps) {
           <ShareDialog
             open={appStore.shareDialogOpen()}
             onOpenChange={appStore.setShareDialogOpen}
+            baseUrl={location.origin}
           />
         </div>
       </ConnectionProvider>
