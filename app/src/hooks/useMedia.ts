@@ -211,6 +211,10 @@ export function useMedia() {
     }
     stream.addTrack(newTrack);
 
+    // Create new MediaStream to trigger signal update (for audio level indicator)
+    const updatedStream = new MediaStream(stream.getTracks());
+    setLocalStream(updatedStream);
+
     // Update selected device ID
     if (kind === 'video') {
       setSelectedVideoId(deviceId);
@@ -220,7 +224,7 @@ export function useMedia() {
 
     // Clean up unused tracks
     newStream.getTracks().forEach((track) => {
-      if (!stream.getTracks().includes(track)) {
+      if (!updatedStream.getTracks().includes(track)) {
         track.stop();
       }
     });
