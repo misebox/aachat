@@ -77,6 +77,7 @@ export const HomePage = () => {
         <IconButton
           onClick={() => appStore.setShareDialogOpen(true)}
           icon={<FiShare2 size={36} />}
+          disabled={!appStore.keyword().trim()}
         />
 
         <IconButton
@@ -102,7 +103,8 @@ export const HomePage = () => {
         <Button
           variant="outline"
           onClick={handleEnter}
-          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white"
+          disabled={!appStore.keyword().trim()}
+          class="border-gray-600 text-white text-base hover:bg-gray-800 hover:border-white disabled:opacity-50"
         >
           Enter
         </Button>
