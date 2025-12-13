@@ -15,7 +15,8 @@ export function useUI() {
    * Calculate AA font size based on viewport dimensions
    */
   function calculateAAFontSize(containerWidth: number, containerHeight: number): number {
-    const widthMultiplier = AA_WIDTH * 0.6 + (AA_WIDTH - 1) * 0.4;
+    // Video: AA_WIDTH chars + letter-spacing, Indicator: 1 char (no letter-spacing)
+    const widthMultiplier = (AA_WIDTH + 1) * 0.6 + (AA_WIDTH - 1) * 0.4;
 
     // Mobile: width <= 768
     if (containerWidth <= 768) {
@@ -33,7 +34,8 @@ export function useUI() {
       const heightPerArea = availableHeight / areaCount;
 
       const fontSizeByHeight = heightPerArea / AA_HEIGHT;
-      const fontSizeByWidth = (containerWidth - 10) / widthMultiplier;
+      // 20 = container padding(10) + margins(4) + video padding/border(4) + indicator padding(2)
+      const fontSizeByWidth = (containerWidth - 20) / widthMultiplier;
 
       return Math.max(4, Math.min(fontSizeByWidth, fontSizeByHeight, 12));
     }
