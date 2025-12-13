@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Header,
   StatusBar,
-  ChatArea,
+  VideoContainer,
   KeywordInput,
   IconButton,
   Typewriter,
@@ -137,9 +137,13 @@ Your face becomes text.`}
           />
         </div>
 
-        <ChatArea
-          localVideoRef={connection.setLocalVideoRef}
-          showRemote={false}
+        <VideoContainer
+          title="You"
+          asciiContent={appStore.localAscii()}
+          audioLevel={appStore.localAudioLevel}
+          fontSize="var(--aa-font-size, 10px)"
+          muted={true}
+          videoRef={connection.setLocalVideoRef}
         />
       </div>
     </div>
