@@ -12,8 +12,10 @@ import {
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
 import { MAX_DIRECT_CONNECT_RETRIES } from '@/lib/constants';
+import { useTranslation } from '@/lib/i18n';
 
 export const DirectPage = () => {
+  const { t } = useTranslation();
   const params = useParams<{ keyword: string }>();
   const navigate = useNavigate();
   const connection = useConnectionContext();
@@ -72,7 +74,7 @@ export const DirectPage = () => {
       if (retryCount >= MAX_DIRECT_CONNECT_RETRIES) {
         // Stop retrying after max attempts
         appStore.setConnectionState('idle');
-        appStore.setStatusText(`Connection failed after ${MAX_DIRECT_CONNECT_RETRIES} attempts`);
+        appStore.setStatusText(t('connectionFailedAfterRetries', { count: MAX_DIRECT_CONNECT_RETRIES }));
         return;
       }
       // Retry after short delay
@@ -107,7 +109,7 @@ export const DirectPage = () => {
               onClick={handleConnect}
               class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
             >
-              Connect
+              {t('connect')}
             </Button>
           }
         >
@@ -116,7 +118,7 @@ export const DirectPage = () => {
             onClick={connection.disconnect}
             class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
           >
-            Leave
+            {t('leave')}
           </Button>
         </Show>
 
