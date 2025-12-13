@@ -93,7 +93,7 @@ export const translations = {
     // Common buttons
     cancel: 'キャンセル',
     apply: '適用',
-    refresh: '更新',
+    refresh: 'リフレッシュ',
     copy: 'コピー',
     copied: 'コピー済',
     share: '共有',
@@ -169,7 +169,7 @@ export const translations = {
       'リアルタイムでP2P接続',
       '登録不要・追跡なし',
       'キーワードを共有するだけ',
-      'あなたの顔がアスキーアートに',
+      '顔がアスキーアートになります',
     ].join('\n'),
   },
 } as const;
