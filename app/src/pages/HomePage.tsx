@@ -1,5 +1,5 @@
 import { onMount, onCleanup, Show } from 'solid-js';
-import { useSearchParams, useNavigate } from '@solidjs/router';
+import { useSearchParams, useNavigate, useLocation } from '@solidjs/router';
 import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,7 @@ import { useConnectionContext } from '@/context/connection';
 export const HomePage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const connection = useConnectionContext();
 
   onMount(() => {
@@ -53,12 +54,12 @@ export const HomePage = () => {
   const handleClear = () => {
     appStore.setKeyword('');
     appStore.setIsKeywordFromURL(false);
-    history.replaceState(null, '', window.location.pathname);
+    history.replaceState(null, '', location.pathname);
   };
 
   return (
     <div class="flex flex-col flex-1">
-      <Header onNavigateHome={() => window.location.href = '/'} onHelpClick={() => appStore.setHelpDialogOpen(true)} />
+      <Header onHelpClick={() => appStore.setHelpDialogOpen(true)} />
 
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
@@ -94,6 +95,10 @@ export const HomePage = () => {
           value={appStore.keyword()}
           onInput={appStore.setKeyword}
           onEnter={handleEnter}
+          onValidationError={(msg) => {
+            appStore.setStatusText(msg);
+            setTimeout(() => appStore.setStatusText(''), 5000);
+          }}
           readonly={appStore.isKeywordFromURL()}
         />
 

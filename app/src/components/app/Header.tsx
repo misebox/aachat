@@ -5,9 +5,9 @@ import { IconButton } from './IconButton';
 import { APP_TITLE } from '@/lib/constants';
 
 interface HeaderProps {
-  onNavigateHome: () => void;
+  onNavigateHome?: () => void;
   subtitle?: string;
-  onHelpClick: () => void;
+  onHelpClick?: () => void;
 }
 
 export const Header: Component<HeaderProps> = (props) => {
@@ -15,13 +15,22 @@ export const Header: Component<HeaderProps> = (props) => {
     <header class="relative flex items-center">
       {/* Left: AACHAT */}
       <h1 class="text-base font-normal text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] pl-2 py-0">
-        <Button
-          variant="ghost"
-          onClick={props.onNavigateHome}
-          class="text-white text-lg font-normal px-2 h-auto hover:bg-gray-800 drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+        <Show
+          when={props.onNavigateHome}
+          fallback={
+            <a href="/" class="text-white no-underline hover:opacity-80 text-lg">
+              {APP_TITLE}
+            </a>
+          }
         >
-          {APP_TITLE}
-        </Button>
+          <Button
+            variant="ghost"
+            onClick={props.onNavigateHome}
+            class="text-white text-lg font-normal px-2 h-auto hover:bg-gray-800 drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+          >
+            {APP_TITLE}
+          </Button>
+        </Show>
       </h1>
 
       {/* Center: Subtitle (DirectPage only) */}
@@ -32,11 +41,15 @@ export const Header: Component<HeaderProps> = (props) => {
       </Show>
 
       {/* Right: Help button */}
-      <IconButton
-        onClick={props.onHelpClick}
-        icon={<FiHelpCircle size={24} />}
-        class="hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2"
-      />
+      <Show when={props.onHelpClick}>
+        {(handler) => (
+          <IconButton
+            onClick={handler()}
+            icon={<FiHelpCircle size={24} />}
+            class="hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2"
+          />
+        )}
+      </Show>
     </header>
   );
 };
