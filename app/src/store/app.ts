@@ -36,6 +36,9 @@ const [cameraReady, setCameraReady] = createSignal(false);
 const [videoEnabled, setVideoEnabled] = createSignal(true);
 const [audioEnabled, setAudioEnabled] = createSignal(true);
 
+// Audio level (0-100)
+const [localAudioLevel, setLocalAudioLevel] = createSignal(0);
+
 // Layout
 const [videoAreaCount, setVideoAreaCount] = createSignal(2);
 
@@ -98,6 +101,10 @@ export const appStore = {
   setVideoEnabled,
   audioEnabled,
   setAudioEnabled,
+
+  // Audio level
+  localAudioLevel,
+  setLocalAudioLevel,
 
   // Layout
   videoAreaCount,

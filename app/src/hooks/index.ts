@@ -6,3 +6,4 @@ export { useMedia } from './useMedia';
 export { useAscii } from './useAscii';
 export { useConnection, type ConnectionCallbacks } from './useConnection';
 export { useUI } from './useUI';
+export { useAudioLevel } from './useAudioLevel';

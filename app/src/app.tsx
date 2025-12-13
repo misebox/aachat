@@ -4,7 +4,7 @@ import { FiHelpCircle } from 'solid-icons/fi';
 import './app.css';
 import { DeviceDialog, HelpDialog, ShareDialog, IconButton } from '@/components/app';
 import { appStore } from '@/store/app';
-import { useConnection, useUI } from '@/hooks';
+import { useConnection, useUI, useAudioLevel } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { ConnectionProvider } from '@/context/connection';
@@ -72,6 +72,14 @@ export default function App(props: ParentProps) {
       connection.ascii.initCanvas(canvasRef);
     }
     ui.setupResizeListeners();
+  });
+
+  // Audio level analysis for local stream
+  const localAudioLevel = useAudioLevel(() => connection.media.localStream());
+
+  // Sync audio level to store
+  createEffect(() => {
+    appStore.setLocalAudioLevel(localAudioLevel());
   });
 
   // Sync local stream to video element and start ASCII conversion
