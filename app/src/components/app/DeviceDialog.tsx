@@ -86,15 +86,15 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
           />
         </div>
 
-        <DialogFooter class="gap-2">
+        <DialogFooter class="flex flex-row gap-2">
           <Button
             variant="outline"
             onClick={props.onRefresh}
-            class="border-gray-600 text-white hover:bg-gray-800"
+            class="flex-1 border-gray-600 text-white hover:bg-gray-800"
           >
             Refresh
           </Button>
-          <Button onClick={handleApply} class="bg-white text-black hover:bg-gray-200">
+          <Button onClick={handleApply} class="flex-1 bg-white text-black hover:bg-gray-200">
             Apply
           </Button>
         </DialogFooter>
