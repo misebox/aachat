@@ -12,8 +12,8 @@ export function useAscii() {
 
   let canvas: HTMLCanvasElement | null = null;
   let ctx: CanvasRenderingContext2D | null = null;
-  let contrastTimer: number | null = null;
-  let conversionTimer: number | null = null;
+  let contrastTimer: ReturnType<typeof setInterval> | null = null;
+  let conversionTimer: ReturnType<typeof setInterval> | null = null;
 
   // Dynamic range for contrast adjustment (separate for local and remote)
   let localMinBrightness = 0;
@@ -173,7 +173,7 @@ export function useAscii() {
     if (contrastTimer !== null) {
       clearInterval(contrastTimer);
     }
-    contrastTimer = window.setInterval(() => {
+    contrastTimer = setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
         analyzeContrast(localVideo, 'local');
       }
@@ -198,7 +198,7 @@ export function useAscii() {
     currentFps = fps;
     const interval = Math.round(1000 / fps);
 
-    conversionTimer = window.setInterval(() => {
+    conversionTimer = setInterval(() => {
       if (localVideoRef && localVideoRef.srcObject && localVideoRef.videoWidth > 0) {
         setLocalAscii(videoToAscii(localVideoRef, 'local'));
       }

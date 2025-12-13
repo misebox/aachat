@@ -1,11 +1,11 @@
 import { onMount, onCleanup, Show } from 'solid-js';
-import { useSearchParams, useNavigate } from '@solidjs/router';
+import { useSearchParams, useNavigate, useLocation } from '@solidjs/router';
 import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
   StatusBar,
-  ChatArea,
+  VideoContainer,
   KeywordInput,
   IconButton,
   Typewriter,
@@ -16,6 +16,7 @@ import { useConnectionContext } from '@/context/connection';
 export const HomePage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const connection = useConnectionContext();
 
   onMount(() => {
@@ -53,12 +54,20 @@ export const HomePage = () => {
   const handleClear = () => {
     appStore.setKeyword('');
     appStore.setIsKeywordFromURL(false);
-    history.replaceState(null, '', window.location.pathname);
+    history.replaceState(null, '', location.pathname);
   };
+  
+  const descriptionTagline = [
+    'Video chat in ASCII art.',
+    'Real-time peer-to-peer connection.',
+    'No registration, no tracking.',
+    'Share a keyword to connect.',
+    'Your face becomes text.',
+  ].join('\n');
 
   return (
     <div class="flex flex-col flex-1">
-      <Header onNavigateHome={() => window.location.href = '/'} onHelpClick={() => appStore.setHelpDialogOpen(true)} />
+      <Header onHelpClick={() => appStore.setHelpDialogOpen(true)} />
 
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
@@ -94,6 +103,10 @@ export const HomePage = () => {
           value={appStore.keyword()}
           onInput={appStore.setKeyword}
           onEnter={handleEnter}
+          onValidationError={(msg) => {
+            appStore.setStatusText(msg);
+            setTimeout(() => appStore.setStatusText(''), 5000);
+          }}
           readonly={appStore.isKeywordFromURL()}
         />
 
@@ -119,22 +132,23 @@ export const HomePage = () => {
       <StatusBar variant="desktop" />
 
       {/* Main content area - flex to push content down */}
-      <div class="flex flex-col justify-around">
+      <div class="flex flex-col justify-around gap-16">
         {/* Tagline - above video area */}
-        <div class="text-center py-4 text-gray-400 text-sm">
+        <div class="text-center mt-10 py-2 text-gray-400 text-sm">
           <Typewriter
-            text={`Video chat in ASCII art.
-Real-time peer-to-peer connection.
-No registration, no tracking.
-Share a keyword to connect.
-Your face becomes text.`}
-            speed={40}
+            class="text-base"
+            text={descriptionTagline}
+            speed={80}
           />
         </div>
 
-        <ChatArea
-          localVideoRef={connection.setLocalVideoRef}
-          showRemote={false}
+        <VideoContainer
+          title="You"
+          asciiContent={appStore.localAscii()}
+          audioLevel={appStore.localAudioLevel}
+          fontSize="var(--aa-font-size, 10px)"
+          muted={true}
+          videoRef={connection.setLocalVideoRef}
         />
       </div>
     </div>

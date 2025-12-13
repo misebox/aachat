@@ -40,40 +40,22 @@ export function useUI() {
       return Math.max(4, Math.min(fontSizeByWidth, fontSizeByHeight, 12));
     }
 
-    // Tablet: width <= 1200
-    if (containerWidth <= 1200) {
-      const isPortrait = containerHeight > containerWidth;
-
-      let availableWidth: number;
-      let availableHeight: number;
-
-      if (isPortrait) {
-        availableWidth = containerWidth - 40;
-        availableHeight = (containerHeight - 160) / 2;
-      } else {
-        availableWidth = (containerWidth - 60) / 2;
-        availableHeight = containerHeight - 120;
-      }
-
-      const fontSizeByWidth = availableWidth / widthMultiplier;
-      const fontSizeByHeight = availableHeight / AA_HEIGHT;
-
-      return Math.max(6, Math.min(fontSizeByWidth, fontSizeByHeight, 16));
-    }
-
-    // Desktop: width > 1200
+    // Desktop/Tablet (>= 768px): horizontal layout (side by side)
+    const gap = 20;
+    const padding = 40;
     const headerHeight = 80;
     const controlsHeight = 60;
     const statusHeight = 30;
-    const gap = 20;
+    const titleHeight = 30;
 
-    const availableHeight = containerHeight - headerHeight - controlsHeight - statusHeight;
-    const availableWidthPerArea = (containerWidth - gap) / 2 - 40;
+    const availableHeight = containerHeight - headerHeight - controlsHeight - statusHeight - titleHeight;
+    const availableWidthPerArea = (containerWidth - gap) / 2 - padding;
 
     const fontSizeByWidth = availableWidthPerArea / widthMultiplier;
-    const fontSizeByHeight = (availableHeight - 30) / AA_HEIGHT; // 30 for title
+    const fontSizeByHeight = availableHeight / AA_HEIGHT;
 
-    return Math.max(8, Math.min(fontSizeByWidth, fontSizeByHeight, 20));
+    // Clamp: min 4px, max 20px
+    return Math.max(4, Math.min(fontSizeByWidth, fontSizeByHeight, 20));
   }
 
   /**
@@ -87,7 +69,6 @@ export function useUI() {
     setAAFontSize(fontSize);
 
     document.documentElement.style.setProperty('--aa-font-size', `${fontSize}px`);
-    document.documentElement.style.setProperty('--remote-aa-font-size', `${fontSize}px`);
 
     // Set actual viewport height for ChatArea
     document.documentElement.style.setProperty('--actual-vh', `${containerHeight}px`);

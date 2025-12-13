@@ -9,6 +9,7 @@ import { APP_TITLE } from '@/lib/constants';
 interface ShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  baseUrl: string;
 }
 
 export const ShareDialog: Component<ShareDialogProps> = (props) => {
@@ -18,8 +19,7 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
   const directUrl = createMemo(() => {
     const keyword = appStore.keyword().trim();
     if (!keyword) return '';
-    const base = window.location.origin;
-    return `${base}/direct/${encodeURIComponent(keyword)}`;
+    return `${props.baseUrl}/direct/${encodeURIComponent(keyword)}`;
   });
 
   // Generate QR code locally

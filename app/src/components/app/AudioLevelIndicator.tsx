@@ -5,7 +5,7 @@ import { ASCII_CHARS } from '@/lib/constants';
 interface AudioLevelIndicatorProps {
   level: Accessor<number>;
   height: number;
-  variant?: 'local' | 'remote';
+  fontSize: string;
 }
 
 export const AudioLevelIndicator: Component<AudioLevelIndicatorProps> = (props) => {
@@ -44,7 +44,7 @@ export const AudioLevelIndicator: Component<AudioLevelIndicatorProps> = (props) 
       content={generateContent()}
       width={1}
       height={props.height}
-      variant={props.variant}
+      fontSize={props.fontSize}
       border={false}
     />
   );

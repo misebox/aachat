@@ -5,7 +5,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "preview:watch": "vite build --watch & vite preview"
+    "preview:watch": "vite build --watch & vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@kobalte/core": "^0.13.11",

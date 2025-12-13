@@ -1,10 +1,10 @@
 import { Component } from 'solid-js';
-import { appStore } from '@/store/app';
 
 interface KeywordInputProps {
   value: string;
   onInput: (value: string) => void;
   onEnter: () => void;
+  onValidationError?: (message: string) => void;
   placeholder?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -18,9 +18,8 @@ export const KeywordInput: Component<KeywordInputProps> = (props) => {
   const applyValue = (target: HTMLInputElement) => {
     const original = target.value;
     const sanitized = sanitize(original);
-    if (original !== sanitized) {
-      appStore.setStatusText('Only [ A-Z a-z 0-9 _ - . ] allowed');
-      setTimeout(() => appStore.setStatusText(''), 5000);
+    if (original !== sanitized && props.onValidationError) {
+      props.onValidationError('Only [ A-Z a-z 0-9 _ - . ] allowed');
     }
     props.onInput(sanitized);
     target.value = sanitized;
@@ -50,7 +49,7 @@ export const KeywordInput: Component<KeywordInputProps> = (props) => {
   return (
     <input
       type="text"
-      inputmode="latin"
+      inputMode="text"
       value={props.value}
       onInput={handleInput}
       onKeyDown={handleKeyDown}

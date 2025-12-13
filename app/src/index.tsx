@@ -2,9 +2,9 @@
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import './global.css';
-import App from './app.tsx';
-import { HomePage } from './pages/HomePage.tsx';
-import { DirectPage } from './pages/DirectPage.tsx';
+import App from './app';
+import { HomePage } from './pages/HomePage';
+import { DirectPage } from './pages/DirectPage';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
