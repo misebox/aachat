@@ -6,6 +6,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { DeviceSelector } from './DeviceSelector';
 import { appStore } from '@/store/app';
@@ -123,16 +130,30 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
           {/* UI Section */}
           <div class="space-y-3">
             <h3 class="text-base uppercase tracking-wider text-gray-500">{t('ui')}</h3>
-            <div class="space-y-1">
-              <label class="text-sm text-gray-300">{t('language')}</label>
-              <select
+            <div class="space-y-2">
+              <label class="text-sm text-white">{t('language')}</label>
+              <Select
                 value={language()}
-                onChange={(e) => setLanguage(e.currentTarget.value as Language)}
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-white"
+                onChange={(value) => value && setLanguage(value as Language)}
+                options={['en', 'ja'] as Language[]}
+                itemComponent={(itemProps) => (
+                  <SelectItem item={itemProps.item}>
+                    {itemProps.item.rawValue === 'en' ? t('english') : t('japanese')}
+                  </SelectItem>
+                )}
               >
-                <option value="en">{t('english')}</option>
-                <option value="ja">{t('japanese')}</option>
-              </select>
+                <SelectTrigger class="bg-transparent border-gray-600 text-white">
+                  <SelectValue<Language>>
+                    {(state) => {
+                      const selected = state.selectedOption();
+                      if (selected === 'en') return t('english');
+                      if (selected === 'ja') return t('japanese');
+                      return t('language');
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent class="bg-neutral-800 border-gray-600" />
+              </Select>
             </div>
           </div>
         </div>
