@@ -1,13 +1,14 @@
-import { Component } from 'solid-js';
+import { Component, Accessor } from 'solid-js';
 import { AsciiDisplay } from './AsciiDisplay';
 import { AudioLevelIndicator } from './AudioLevelIndicator';
-import { appStore } from '@/store/app';
 import { AA_WIDTH, AA_HEIGHT } from '@/lib/constants';
 
 interface VideoContainerProps {
   title: string;
   asciiContent: string;
-  variant: 'local' | 'remote';
+  audioLevel: Accessor<number>;
+  fontSize: string;
+  muted: boolean;
   videoRef?: (el: HTMLVideoElement) => void;
 }
 
@@ -22,18 +23,18 @@ export const VideoContainer: Component<VideoContainerProps> = (props) => {
           content={props.asciiContent}
           width={AA_WIDTH}
           height={AA_HEIGHT}
-          variant={props.variant}
+          fontSize={props.fontSize}
         />
         <AudioLevelIndicator
-          level={props.variant === 'local' ? appStore.localAudioLevel : appStore.remoteAudioLevel}
+          level={props.audioLevel}
           height={AA_HEIGHT}
-          variant={props.variant}
+          fontSize={props.fontSize}
         />
       </div>
       <video
         ref={props.videoRef}
         autoplay
-        muted={props.variant === 'local'}
+        muted={props.muted}
         class="hidden"
       />
     </div>

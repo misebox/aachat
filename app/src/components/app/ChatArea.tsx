@@ -9,6 +9,9 @@ interface ChatAreaProps {
   showRemote?: boolean;
 }
 
+const LOCAL_FONT_SIZE = 'var(--aa-font-size, 10px)';
+const REMOTE_FONT_SIZE = 'var(--remote-aa-font-size, 8px)';
+
 export const ChatArea: Component<ChatAreaProps> = (props) => {
   const showRemote = () => props.showRemote !== false;
 
@@ -18,7 +21,9 @@ export const ChatArea: Component<ChatAreaProps> = (props) => {
         <VideoContainer
           title="Peer"
           asciiContent={appStore.remoteAscii()}
-          variant="remote"
+          audioLevel={appStore.remoteAudioLevel}
+          fontSize={REMOTE_FONT_SIZE}
+          muted={false}
           videoRef={props.remoteVideoRef}
         />
 
@@ -28,7 +33,9 @@ export const ChatArea: Component<ChatAreaProps> = (props) => {
       <VideoContainer
         title="You"
         asciiContent={appStore.localAscii()}
-        variant="local"
+        audioLevel={appStore.localAudioLevel}
+        fontSize={LOCAL_FONT_SIZE}
+        muted={true}
         videoRef={props.localVideoRef}
       />
     </div>
