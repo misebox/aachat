@@ -133,15 +133,19 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
    */
   async function hostSession(keyword: string): Promise<boolean> {
     logger.log('=== HOST SESSION START ===');
-    callbacks.onStatusChange?.('Starting camera...');
 
-    // 1. Start camera
-    const cameraStarted = await media.startCamera();
-    if (!cameraStarted) {
-      callbacks.onError?.('Failed to start camera');
-      return false;
+    // 1. Start camera (skip if already running)
+    if (!media.localStream()) {
+      callbacks.onStatusChange?.('Starting camera...');
+      const cameraStarted = await media.startCamera();
+      if (!cameraStarted) {
+        callbacks.onError?.('Failed to start camera');
+        return false;
+      }
+      logger.log('Camera started');
+    } else {
+      logger.log('Camera already running');
     }
-    logger.log('Camera started');
 
     // Initialize session (no hash, simple paths)
     session.startSession(true, keyword);
@@ -269,15 +273,19 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
    */
   async function guestSession(keyword: string): Promise<boolean> {
     logger.log('=== GUEST SESSION START ===');
-    callbacks.onStatusChange?.('Starting camera...');
 
-    // 1. Start camera
-    const cameraStarted = await media.startCamera();
-    if (!cameraStarted) {
-      callbacks.onError?.('Failed to start camera');
-      return false;
+    // 1. Start camera (skip if already running)
+    if (!media.localStream()) {
+      callbacks.onStatusChange?.('Starting camera...');
+      const cameraStarted = await media.startCamera();
+      if (!cameraStarted) {
+        callbacks.onError?.('Failed to start camera');
+        return false;
+      }
+      logger.log('Camera started');
+    } else {
+      logger.log('Camera already running');
     }
-    logger.log('Camera started');
 
     // Initialize session
     session.startSession(false, keyword);

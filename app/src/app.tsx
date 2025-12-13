@@ -255,15 +255,14 @@ export default function App(props: ParentProps) {
 
   const handleStartCamera = async () => {
     const settings = loadSettings();
-    const success = await connection.media.startCamera(
-      settings.selectedVideoDevice,
-      settings.selectedAudioDevice
-    );
+    const success = await connection.media.startCamera({
+      videoDeviceId: settings.selectedVideoDevice,
+      audioDeviceId: settings.selectedAudioDevice,
+      videoEnabled: appStore.videoEnabled(),
+      audioEnabled: appStore.audioEnabled(),
+    });
     if (success) {
       appStore.setCameraReady(true);
-      // Apply current video/audio enabled state to the new stream
-      connection.media.setVideoEnabled(appStore.videoEnabled());
-      connection.media.setAudioEnabled(appStore.audioEnabled());
     }
   };
 

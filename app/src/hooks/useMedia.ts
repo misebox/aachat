@@ -77,10 +77,18 @@ export function useMedia() {
     return base;
   }
 
+  interface StartCameraOptions {
+    videoDeviceId?: string;
+    audioDeviceId?: string;
+    videoEnabled?: boolean;
+    audioEnabled?: boolean;
+  }
+
   /**
    * Start camera with resolution fallback
    */
-  async function startCamera(videoDeviceId?: string, audioDeviceId?: string): Promise<boolean> {
+  async function startCamera(options: StartCameraOptions = {}): Promise<boolean> {
+    const { videoDeviceId, audioDeviceId, videoEnabled = true, audioEnabled = true } = options;
     try {
       const resolutions = [
         { width: 80, height: 60 },
@@ -112,20 +120,23 @@ export function useMedia() {
         throw new Error('Failed to get media stream');
       }
 
-      setLocalStream(stream);
-
       // Update selected device IDs from actual tracks
       const videoTrack = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
 
+      // Apply enabled state immediately on the tracks
       if (videoTrack) {
+        videoTrack.enabled = videoEnabled;
         const settings = videoTrack.getSettings();
         if (settings.deviceId) setSelectedVideoId(settings.deviceId);
       }
       if (audioTrack) {
+        audioTrack.enabled = audioEnabled;
         const settings = audioTrack.getSettings();
         if (settings.deviceId) setSelectedAudioId(settings.deviceId);
       }
+
+      setLocalStream(stream);
 
       console.log('Camera started:', videoTrack?.label || '-', '/', audioTrack?.label || '-');
       return true;
