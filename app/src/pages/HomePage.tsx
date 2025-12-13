@@ -56,6 +56,14 @@ export const HomePage = () => {
     appStore.setIsKeywordFromURL(false);
     history.replaceState(null, '', location.pathname);
   };
+  
+  const descriptionTagline = [
+    'Video chat in ASCII art.',
+    'Real-time peer-to-peer connection.',
+    'No registration, no tracking.',
+    'Share a keyword to connect.',
+    'Your face becomes text.',
+  ].join('\n');
 
   return (
     <div class="flex flex-col flex-1">
@@ -124,16 +132,13 @@ export const HomePage = () => {
       <StatusBar variant="desktop" />
 
       {/* Main content area - flex to push content down */}
-      <div class="flex flex-col justify-around">
+      <div class="flex flex-col justify-around gap-16">
         {/* Tagline - above video area */}
-        <div class="text-center py-4 text-gray-400 text-sm">
+        <div class="text-center mt-10 py-2 text-gray-400 text-sm">
           <Typewriter
-            text={`Video chat in ASCII art.
-Real-time peer-to-peer connection.
-No registration, no tracking.
-Share a keyword to connect.
-Your face becomes text.`}
-            speed={40}
+            class="text-base"
+            text={descriptionTagline}
+            speed={80}
           />
         </div>
 
