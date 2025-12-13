@@ -2,6 +2,11 @@ import { createSignal, createEffect, onCleanup } from 'solid-js';
 import { ASCII_CHARS, CHAR_COUNT, AA_WIDTH, AA_HEIGHT } from '@/lib/constants';
 import { appStore } from '@/store/app';
 
+interface BrightnessRange {
+  min: number;
+  max: number;
+}
+
 /**
  * Hook for video to ASCII art conversion
  */
@@ -16,10 +21,8 @@ export function useAscii() {
   let conversionTimer: ReturnType<typeof setInterval> | null = null;
 
   // Dynamic range for contrast adjustment (separate for local and remote)
-  let localMinBrightness = 0;
-  let localMaxBrightness = 255;
-  let remoteMinBrightness = 0;
-  let remoteMaxBrightness = 255;
+  let localBrightness: BrightnessRange = { min: 0, max: 255 };
+  let remoteBrightness: BrightnessRange = { min: 0, max: 255 };
   let lastRemoteVideoLogTime = 0;
 
   onCleanup(() => {
@@ -37,7 +40,7 @@ export function useAscii() {
   /**
    * Convert video frame to ASCII art
    */
-  function videoToAscii(video: HTMLVideoElement, variant: 'local' | 'remote'): string {
+  function videoToAscii(video: HTMLVideoElement, brightness: BrightnessRange): string {
     if (!canvas || !ctx || !video.videoWidth || !video.videoHeight) {
       return '';
     }
@@ -49,24 +52,21 @@ export function useAscii() {
     const imageData = ctx.getImageData(0, 0, AA_WIDTH, AA_HEIGHT);
     const pixels = imageData.data;
 
-    const minBrightness = variant === 'local' ? localMinBrightness : remoteMinBrightness;
-    const maxBrightness = variant === 'local' ? localMaxBrightness : remoteMaxBrightness;
-
     let ascii = '';
 
     for (let y = 0; y < AA_HEIGHT; y++) {
       for (let x = 0; x < AA_WIDTH; x++) {
         const i = (y * AA_WIDTH + x) * 4;
-        let brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        let pixelBrightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
 
         // Apply dynamic range normalization if enabled
-        if (dynamicRangeEnabled() && maxBrightness > minBrightness) {
-          brightness = (brightness - minBrightness) / (maxBrightness - minBrightness);
-          brightness = Math.max(0, Math.min(1, brightness));
-          const charIndex = Math.floor(brightness * (CHAR_COUNT - 1));
+        if (dynamicRangeEnabled() && brightness.max > brightness.min) {
+          pixelBrightness = (pixelBrightness - brightness.min) / (brightness.max - brightness.min);
+          pixelBrightness = Math.max(0, Math.min(1, pixelBrightness));
+          const charIndex = Math.floor(pixelBrightness * (CHAR_COUNT - 1));
           ascii += ASCII_CHARS[charIndex];
         } else {
-          const charIndex = Math.floor((brightness / 255) * (CHAR_COUNT - 1));
+          const charIndex = Math.floor((pixelBrightness / 255) * (CHAR_COUNT - 1));
           ascii += ASCII_CHARS[charIndex];
         }
       }
@@ -78,10 +78,11 @@ export function useAscii() {
 
   /**
    * Analyze video for contrast adjustment
+   * Returns the calculated brightness range
    */
-  function analyzeContrast(video: HTMLVideoElement, variant: 'local' | 'remote'): void {
+  function analyzeContrast(video: HTMLVideoElement): BrightnessRange | null {
     if (!canvas || !ctx || !video.videoWidth || !video.videoHeight) {
-      return;
+      return null;
     }
 
     const sampleWidth = 64;
@@ -148,13 +149,7 @@ export function useAscii() {
       newMax = Math.min(255, center + 15);
     }
 
-    if (variant === 'local') {
-      localMinBrightness = newMin;
-      localMaxBrightness = newMax;
-    } else {
-      remoteMinBrightness = newMin;
-      remoteMaxBrightness = newMax;
-    }
+    return { min: newMin, max: newMax };
   }
 
   let localVideoRef: HTMLVideoElement | null = null;
@@ -175,10 +170,12 @@ export function useAscii() {
     }
     contrastTimer = setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
-        analyzeContrast(localVideo, 'local');
+        const range = analyzeContrast(localVideo);
+        if (range) localBrightness = range;
       }
       if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
-        analyzeContrast(remoteVideo, 'remote');
+        const range = analyzeContrast(remoteVideo);
+        if (range) remoteBrightness = range;
       }
     }, 1000);
   }
@@ -200,11 +197,11 @@ export function useAscii() {
 
     conversionTimer = setInterval(() => {
       if (localVideoRef && localVideoRef.srcObject && localVideoRef.videoWidth > 0) {
-        setLocalAscii(videoToAscii(localVideoRef, 'local'));
+        setLocalAscii(videoToAscii(localVideoRef, localBrightness));
       }
 
       if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth > 0) {
-        setRemoteAscii(videoToAscii(remoteVideoRef, 'remote'));
+        setRemoteAscii(videoToAscii(remoteVideoRef, remoteBrightness));
       } else if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth === 0) {
         const now = Date.now();
         if (now - lastRemoteVideoLogTime > 5000) {
@@ -248,7 +245,6 @@ export function useAscii() {
     dynamicRangeEnabled,
     setDynamicRangeEnabled,
     initCanvas,
-    videoToAscii,
     startConversion,
     stopConversion,
   };
