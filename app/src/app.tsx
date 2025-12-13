@@ -294,7 +294,7 @@ export default function App(props: ParentProps) {
             class="fixed top-1 right-1 z-[110] md:hidden bg-neutral-800"
           />
 
-          <div class="container max-w-full mx-0 px-1 py-2">
+          <div class="flex flex-col min-h-[calc(100vh-1rem)] max-w-full mx-0 px-1 py-2">
             {props.children}
           </div>
 

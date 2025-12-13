@@ -8,6 +8,7 @@ import {
   ChatArea,
   KeywordInput,
   IconButton,
+  Typewriter,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
@@ -21,7 +22,7 @@ export const HomePage = () => {
     appStore.setVideoAreaCount(1);
     // Stop camera on home page by default
     connection.stopCamera();
-    const keyword = searchParams.k;
+    const keyword = ((k) => (Array.isArray(k) ? k[0] : k))(searchParams.k);
     if (keyword) {
       appStore.setKeyword(keyword);
       appStore.setIsKeywordFromURL(true);
@@ -56,8 +57,9 @@ export const HomePage = () => {
   };
 
   return (
-    <>
+    <div class="flex flex-col flex-1">
       <Header onNavigateHome={() => window.location.href = '/'} onHelpClick={() => appStore.setHelpDialogOpen(true)} />
+
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
@@ -115,10 +117,26 @@ export const HomePage = () => {
       </div>
 
       <StatusBar variant="desktop" />
-      <ChatArea
-        localVideoRef={connection.setLocalVideoRef}
-        showRemote={false}
-      />
-    </>
+
+      {/* Main content area - flex to push content down */}
+      <div class="flex flex-col justify-around">
+        {/* Tagline - above video area */}
+        <div class="text-center py-4 text-gray-400 text-sm">
+          <Typewriter
+            text={`Video chat in ASCII art.
+Real-time peer-to-peer connection.
+No registration, no tracking.
+Share a keyword to connect.
+Your face becomes text.`}
+            speed={40}
+          />
+        </div>
+
+        <ChatArea
+          localVideoRef={connection.setLocalVideoRef}
+          showRemote={false}
+        />
+      </div>
+    </div>
   );
 };

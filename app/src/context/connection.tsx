@@ -4,7 +4,7 @@ interface ConnectionContextValue {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   refreshDevices: () => Promise<void>;
-  applyDevices: (videoDeviceId: string, audioDeviceId: string) => Promise<void>;
+  applyDevices: (videoDeviceId: string, audioDeviceId: string, fps: number) => Promise<void>;
   setLocalVideoRef: (el: HTMLVideoElement) => void;
   setRemoteVideoRef: (el: HTMLVideoElement) => void;
   toggleVideo: () => void;

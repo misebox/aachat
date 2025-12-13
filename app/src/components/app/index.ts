@@ -11,3 +11,4 @@ export { ShareDialog } from './ShareDialog';
 export { KeywordInput } from './KeywordInput';
 export { IconButton } from './IconButton';
 export { AudioLevelIndicator } from './AudioLevelIndicator';
+export { Typewriter } from './Typewriter';
