@@ -36,6 +36,10 @@ export const translations = {
     audio: 'Audio',
     quality: 'Quality',
     fps: 'FPS',
+    ui: 'UI',
+    language: 'Language',
+    english: 'English',
+    japanese: '日本語',
 
     // Join confirm dialog
     joinConfirmMessage: 'You are about to join a video chat room with keyword:',
@@ -119,6 +123,10 @@ export const translations = {
     audio: 'オーディオ',
     quality: '品質',
     fps: 'FPS',
+    ui: 'UI',
+    language: '言語',
+    english: 'English',
+    japanese: '日本語',
 
     // Join confirm dialog
     joinConfirmMessage: '以下のキーワードでビデオチャットルームに参加します：',

@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { DeviceSelector } from './DeviceSelector';
 import { appStore } from '@/store/app';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, type Language } from '@/lib/i18n';
 
 const FPS_OPTIONS = [5, 10, 30, 60] as const;
 
@@ -19,7 +19,7 @@ interface DeviceDialogProps {
 }
 
 export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
-  const { t } = useTranslation();
+  const { t, language, setLanguage } = useTranslation();
   const [tempVideoDevice, setTempVideoDevice] = createSignal('');
   const [tempAudioDevice, setTempAudioDevice] = createSignal('');
   const [tempFps, setTempFps] = createSignal(30);
@@ -117,6 +117,22 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
                   )}
                 </For>
               </div>
+            </div>
+          </div>
+
+          {/* UI Section */}
+          <div class="space-y-3">
+            <h3 class="text-base uppercase tracking-wider text-gray-500">{t('ui')}</h3>
+            <div class="space-y-1">
+              <label class="text-sm text-gray-300">{t('language')}</label>
+              <select
+                value={language()}
+                onChange={(e) => setLanguage(e.currentTarget.value as Language)}
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-white"
+              >
+                <option value="en">{t('english')}</option>
+                <option value="ja">{t('japanese')}</option>
+              </select>
             </div>
           </div>
         </div>
