@@ -64,36 +64,14 @@ export default function App(props: ParentProps) {
     },
   });
 
-  // Initialize canvas, setup UI, and start camera
-  onMount(async () => {
+  // Initialize canvas and setup UI (camera is started by pages as needed)
+  onMount(() => {
     document.title = APP_TITLE;
 
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
     ui.setupResizeListeners();
-
-    // Load saved settings
-    const settings = loadSettings();
-
-    // Start camera with saved device preferences
-    await connection.media.startCamera(settings.selectedVideoDevice, settings.selectedAudioDevice);
-    appStore.setCameraReady(true);
-
-    // Validate and apply saved device settings
-    const videoDevices = connection.media.videoDevices();
-    const audioDevices = connection.media.audioDevices();
-
-    const validVideo = videoDevices.some(d => d.deviceId === settings.selectedVideoDevice);
-    const validAudio = audioDevices.some(d => d.deviceId === settings.selectedAudioDevice);
-
-    // Clear invalid settings
-    if (!validVideo || !validAudio) {
-      saveSettings({
-        selectedVideoDevice: validVideo ? settings.selectedVideoDevice : '',
-        selectedAudioDevice: validAudio ? settings.selectedAudioDevice : '',
-      });
-    }
   });
 
   // Sync local stream to video element and start ASCII conversion
@@ -253,6 +231,24 @@ export default function App(props: ParentProps) {
     connection.media.setAudioEnabled(newState);
   };
 
+  const handleStartCamera = async () => {
+    const settings = loadSettings();
+    const success = await connection.media.startCamera(
+      settings.selectedVideoDevice,
+      settings.selectedAudioDevice
+    );
+    if (success) {
+      appStore.setCameraReady(true);
+    }
+  };
+
+  const handleStopCamera = () => {
+    connection.media.stopCamera();
+    connection.ascii.stopConversion();
+    appStore.setCameraReady(false);
+    appStore.setLocalAscii('');
+  };
+
   const connectionContextValue = {
     connect: handleConnect,
     disconnect: handleLeave,
@@ -262,6 +258,8 @@ export default function App(props: ParentProps) {
     setRemoteVideoRef,
     toggleVideo: handleToggleVideo,
     toggleAudio: handleToggleAudio,
+    startCamera: handleStartCamera,
+    stopCamera: handleStopCamera,
   };
 
   return (

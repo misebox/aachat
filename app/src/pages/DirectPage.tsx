@@ -28,10 +28,14 @@ export const DirectPage = () => {
     connection.connect();
   };
 
-  onMount(() => {
+  onMount(async () => {
     const keyword = decodeURIComponent(params.keyword);
     appStore.setKeyword(keyword);
     appStore.setIsKeywordFromURL(true);
+    // Start camera for connection
+    if (!appStore.cameraReady()) {
+      await connection.startCamera();
+    }
   });
 
   // Auto-connect when camera is ready

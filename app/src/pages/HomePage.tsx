@@ -1,4 +1,4 @@
-import { onMount, onCleanup } from 'solid-js';
+import { onMount, onCleanup, Show } from 'solid-js';
 import { useSearchParams, useNavigate } from '@solidjs/router';
 import { FiSettings, FiHelpCircle, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,6 @@ import {
   ChatArea,
   KeywordInput,
   IconButton,
-  ShareDialog,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
@@ -20,6 +19,8 @@ export const HomePage = () => {
 
   onMount(() => {
     appStore.setVideoAreaCount(1);
+    // Stop camera on home page by default
+    connection.stopCamera();
     const keyword = searchParams.k;
     if (keyword) {
       appStore.setKeyword(keyword);
@@ -30,6 +31,14 @@ export const HomePage = () => {
   onCleanup(() => {
     appStore.setVideoAreaCount(2);
   });
+
+  const handleToggleCamera = () => {
+    if (appStore.cameraReady()) {
+      connection.stopCamera();
+    } else {
+      connection.startCamera();
+    }
+  };
 
   const handleEnter = () => {
     const keyword = appStore.keyword().trim();
@@ -52,16 +61,18 @@ export const HomePage = () => {
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
-          onClick={connection.toggleVideo}
-          icon={appStore.videoEnabled() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
-          class={appStore.videoEnabled() ? '' : 'text-red-500'}
+          onClick={handleToggleCamera}
+          icon={appStore.cameraReady() ? <FiVideo size={36} /> : <FiVideoOff size={36} />}
+          class={appStore.cameraReady() ? '' : 'text-red-500'}
         />
 
-        <IconButton
-          onClick={connection.toggleAudio}
-          icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
-          class={appStore.audioEnabled() ? '' : 'text-red-500'}
-        />
+        <Show when={appStore.cameraReady()}>
+          <IconButton
+            onClick={connection.toggleAudio}
+            icon={appStore.audioEnabled() ? <FiMic size={36} /> : <FiMicOff size={36} />}
+            class={appStore.audioEnabled() ? '' : 'text-red-500'}
+          />
+        </Show>
 
         <IconButton
           onClick={() => appStore.setShareDialogOpen(true)}

@@ -9,6 +9,8 @@ interface ConnectionContextValue {
   setRemoteVideoRef: (el: HTMLVideoElement) => void;
   toggleVideo: () => void;
   toggleAudio: () => void;
+  startCamera: () => Promise<void>;
+  stopCamera: () => void;
 }
 
 const ConnectionContext = createContext<ConnectionContextValue>();
