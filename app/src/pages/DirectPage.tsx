@@ -18,8 +18,13 @@ export const DirectPage = () => {
   const connection = useConnectionContext();
   let retryCount = 0;
 
-  const handleNavigateHome = async () => {
-    await connection.disconnect();
+  const handleNavigateHome = () => {
+    connection.disconnect();
+    connection.stopCamera();
+    appStore.setKeyword('');
+    appStore.setIsKeywordFromURL(false);
+    appStore.setConnectionState('idle');
+    appStore.setStatusText('');
     navigate('/');
   };
 

@@ -57,7 +57,7 @@ export const HomePage = () => {
 
   return (
     <>
-      <Header />
+      <Header onNavigateHome={() => window.location.href = '/'} />
       {/* Icon controls - PC: row 1, Mobile: footer */}
       <div class="controls flex items-center justify-center gap-2 py-2 px-2 md:static md:bg-transparent md:border-none fixed bottom-0 left-0 right-0 bg-black border-t border-gray-700 z-50">
         <IconButton
