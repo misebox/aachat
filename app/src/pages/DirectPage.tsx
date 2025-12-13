@@ -1,4 +1,4 @@
-import { onMount, createEffect, on, Show } from 'solid-js';
+import { onMount, createEffect, on, Show, createSignal } from 'solid-js';
 import { useParams, useNavigate } from '@solidjs/router';
 import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import {
   StatusBar,
   ChatArea,
   IconButton,
+  JoinConfirmDialog,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
@@ -17,6 +18,8 @@ export const DirectPage = () => {
   const navigate = useNavigate();
   const connection = useConnectionContext();
   let retryCount = 0;
+
+  const [showConfirmDialog, setShowConfirmDialog] = createSignal(true);
 
   const handleNavigateHome = () => {
     connection.disconnect();
@@ -33,14 +36,18 @@ export const DirectPage = () => {
     connection.connect();
   };
 
-  onMount(async () => {
-    const keyword = decodeURIComponent(params.keyword);
-    appStore.setKeyword(keyword);
-    appStore.setIsKeywordFromURL(true);
-    // Start camera for connection
+  const handleConfirmJoin = async () => {
+    setShowConfirmDialog(false);
+    // Start camera after confirmation
     if (!appStore.cameraReady()) {
       await connection.startCamera();
     }
+  };
+
+  onMount(() => {
+    const keyword = decodeURIComponent(params.keyword);
+    appStore.setKeyword(keyword);
+    appStore.setIsKeywordFromURL(true);
   });
 
   // Auto-connect when camera is ready
@@ -127,6 +134,13 @@ export const DirectPage = () => {
       <ChatArea
         localVideoRef={connection.setLocalVideoRef}
         remoteVideoRef={connection.setRemoteVideoRef}
+      />
+
+      <JoinConfirmDialog
+        open={showConfirmDialog()}
+        keyword={appStore.keyword()}
+        onConfirm={handleConfirmJoin}
+        onCancel={handleNavigateHome}
       />
     </>
   );

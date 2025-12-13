@@ -7,6 +7,7 @@ export { DeviceDialog } from './SettingsDialog';
 export { DeviceSelector } from './DeviceSelector';
 export { HelpDialog } from './HelpDialog';
 export { ShareDialog } from './ShareDialog';
+export { JoinConfirmDialog } from './JoinConfirmDialog';
 export { KeywordInput } from './KeywordInput';
 export { IconButton } from './IconButton';
 export { AudioLevelIndicator } from './AudioLevelIndicator';
