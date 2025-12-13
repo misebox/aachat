@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { appStore } from '@/store/app';
 import { APP_TITLE } from '@/lib/constants';
+import { useTranslation } from '@/lib/i18n';
 
 interface ShareDialogProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ShareDialogProps {
 }
 
 export const ShareDialog: Component<ShareDialogProps> = (props) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = createSignal(false);
   const [qrDataUrl, setQrDataUrl] = createSignal('');
 
@@ -67,10 +69,10 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent class="bg-neutral-900 border-gray-700 text-white max-w-sm">
         <DialogHeader>
-          <DialogTitle class="text-white">Share</DialogTitle>
+          <DialogTitle class="text-white">{t('share')}</DialogTitle>
         </DialogHeader>
 
-        <Show when={directUrl()} fallback={<p class="text-gray-400">Enter a keyword first</p>}>
+        <Show when={directUrl()} fallback={<p class="text-gray-400">{t('enterKeywordFirst')}</p>}>
           <div class="flex flex-col items-center gap-4">
             {/* QR Code */}
             <Show when={qrDataUrl()}>
@@ -81,7 +83,7 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
 
             {/* URL */}
             <div class="w-full">
-              <p class="text-xs text-gray-400 mb-1">URL</p>
+              <p class="text-xs text-gray-400 mb-1">{t('url')}</p>
               <div class="bg-neutral-800 border border-gray-600 rounded px-2 py-2 text-sm text-white break-all">
                 {directUrl()}
               </div>
@@ -94,8 +96,8 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
                 onClick={handleCopy}
                 class="border-gray-600 text-white hover:bg-gray-800 flex items-center gap-2"
               >
-                <Show when={copied()} fallback={<><FiCopy size={20} /> Copy</>}>
-                  <FiCheck size={20} /> Copied
+                <Show when={copied()} fallback={<><FiCopy size={20} /> {t('copy')}</>}>
+                  <FiCheck size={20} /> {t('copied')}
                 </Show>
               </Button>
               <Show when={canShare()}>
@@ -105,7 +107,7 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
                   class="border-gray-600 text-white hover:bg-gray-800 flex items-center gap-2"
                 >
                   <FiShare2 size={20} />
-                  Share
+                  {t('share')}
                 </Button>
               </Show>
             </div>

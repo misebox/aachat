@@ -1,57 +1,56 @@
 import { Component } from 'solid-js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { appStore } from '@/store/app';
+import { useTranslation } from '@/lib/i18n';
 
 export const HelpDialog: Component = () => {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={appStore.helpDialogOpen()} onOpenChange={appStore.setHelpDialogOpen}>
       <DialogContent class="bg-neutral-900 border-gray-600 text-white max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Help</DialogTitle>
+          <DialogTitle>{t('help')}</DialogTitle>
         </DialogHeader>
 
         <div class="space-y-4 text-sm leading-relaxed">
           <section>
-            <h4 class="text-white font-medium mb-2">About</h4>
-            <p class="text-gray-300">
-              Real-time video chat app that converts video to ASCII art.
-            </p>
+            <h4 class="text-white font-medium mb-2">{t('about')}</h4>
+            <p class="text-gray-300">{t('aboutDescription')}</p>
           </section>
 
           <section>
-            <h4 class="text-white font-medium mb-2">How to Use</h4>
+            <h4 class="text-white font-medium mb-2">{t('howToUse')}</h4>
             <ol class="list-decimal list-inside space-y-2 text-gray-300">
-              <li>Enter a keyword and click Enter to join the room</li>
-              <li>Share the URL with your peer</li>
-              <li>Anyone with the same URL can join the call</li>
-              <li>Click Leave to end the call</li>
+              <li>{t('howToUse1')}</li>
+              <li>{t('howToUse2')}</li>
+              <li>{t('howToUse3')}</li>
+              <li>{t('howToUse4')}</li>
             </ol>
           </section>
 
           <section>
-            <h4 class="text-white font-medium mb-2">Share</h4>
-            <p class="text-gray-300">
-              Click the Share button to copy the current URL. Send it to your peer - they can join by opening the link directly.
-            </p>
+            <h4 class="text-white font-medium mb-2">{t('share')}</h4>
+            <p class="text-gray-300">{t('shareDescription')}</p>
           </section>
 
           <section>
-            <h4 class="text-white font-medium mb-2">Settings</h4>
+            <h4 class="text-white font-medium mb-2">{t('settings')}</h4>
             <ul class="list-disc list-inside space-y-1 text-gray-300">
-              <li><span class="text-white">Device:</span> Switch camera and microphone</li>
-              <li><span class="text-white">FPS:</span> Adjust display refresh rate (lower = less CPU)</li>
+              <li><span class="text-white">{t('device')}:</span> {t('deviceDescription')}</li>
+              <li><span class="text-white">{t('fps')}:</span> {t('fpsDescription')}</li>
             </ul>
           </section>
 
           <section>
-            <h4 class="text-white font-medium mb-2">Notes</h4>
+            <h4 class="text-white font-medium mb-2">{t('notes')}</h4>
             <ul class="list-disc list-inside space-y-1 text-gray-300">
-              <li>Camera and microphone permission required</li>
-              <li>Use a unique keyword to avoid conflicts</li>
+              <li>{t('note1')}</li>
+              <li>{t('note2')}</li>
             </ul>
           </section>
 
-          <p class="text-center text-xs text-gray-500 pt-4">misebox 2025.</p>
+          <p class="text-center text-xs text-gray-500 pt-4">{t('copyright')}</p>
         </div>
       </DialogContent>
     </Dialog>

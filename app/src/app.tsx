@@ -8,6 +8,7 @@ import { useConnection, useUI, useAudioLevel } from '@/hooks';
 import { APP_TITLE } from '@/lib/constants';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { ConnectionProvider } from '@/context/connection';
+import { t } from '@/lib/i18n';
 
 export default function App(props: ParentProps) {
   const [localVideoRef, setLocalVideoRef] = createSignal<HTMLVideoElement | undefined>();
@@ -35,12 +36,12 @@ export default function App(props: ParentProps) {
     },
     onPeerLeft: () => {
       appStore.setConnectionState('idle');
-      appStore.setStatusText('Call ended');
+      appStore.setStatusText(t('callEnded'));
       appStore.setRemoteAscii('');
     },
     onPeerInitiatedLeave: async () => {
       appStore.setRemoteAscii('');
-      appStore.setStatusText('Peer left. Reconnecting...');
+      appStore.setStatusText(t('peerLeftReconnecting'));
       appStore.setConnectionState('connecting');
       // Auto-reconnect with current keyword
       const keyword = appStore.keyword();
@@ -51,7 +52,7 @@ export default function App(props: ParentProps) {
         }
       } else {
         appStore.setConnectionState('idle');
-        appStore.setStatusText('Call ended');
+        appStore.setStatusText(t('callEnded'));
       }
     },
     onError: (error) => {
@@ -185,12 +186,12 @@ export default function App(props: ParentProps) {
     console.log('keyword:', keyword);
 
     if (!keyword.trim()) {
-      appStore.setStatusText('Please enter a keyword');
+      appStore.setStatusText(t('pleaseEnterKeyword'));
       return;
     }
 
     appStore.setConnectionState('connecting');
-    appStore.setStatusText('Connecting...');
+    appStore.setStatusText(t('connecting'));
 
     try {
       console.log('Calling connection.connect...');
@@ -201,7 +202,7 @@ export default function App(props: ParentProps) {
       }
     } catch (error) {
       console.error('handleConnect error:', error);
-      appStore.setStatusText('Connection failed');
+      appStore.setStatusText(t('connectionFailed'));
       appStore.setConnectionState('idle');
     }
   };
