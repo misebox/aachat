@@ -1,4 +1,4 @@
-import { Component, Show } from 'solid-js';
+import { Component } from 'solid-js';
 import { AsciiDisplay } from './AsciiDisplay';
 import { AudioLevelIndicator } from './AudioLevelIndicator';
 import { appStore } from '@/store/app';
@@ -18,9 +18,10 @@ export const VideoContainer: Component<VideoContainerProps> = (props) => {
       </h3>
       <div class="flex items-end gap-1">
         <AsciiDisplay content={props.asciiContent} variant={props.variant} />
-        <Show when={props.variant === 'local'}>
-          <AudioLevelIndicator level={appStore.localAudioLevel} variant={props.variant} />
-        </Show>
+        <AudioLevelIndicator
+          level={props.variant === 'local' ? appStore.localAudioLevel : appStore.remoteAudioLevel}
+          variant={props.variant}
+        />
       </div>
       <video
         ref={props.videoRef}

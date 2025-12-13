@@ -38,6 +38,7 @@ const [audioEnabled, setAudioEnabled] = createSignal(true);
 
 // Audio level (0-100)
 const [localAudioLevel, setLocalAudioLevel] = createSignal(0);
+const [remoteAudioLevel, setRemoteAudioLevel] = createSignal(0);
 
 // Layout
 const [videoAreaCount, setVideoAreaCount] = createSignal(2);
@@ -105,6 +106,8 @@ export const appStore = {
   // Audio level
   localAudioLevel,
   setLocalAudioLevel,
+  remoteAudioLevel,
+  setRemoteAudioLevel,
 
   // Layout
   videoAreaCount,

@@ -74,12 +74,17 @@ export default function App(props: ParentProps) {
     ui.setupResizeListeners();
   });
 
-  // Audio level analysis for local stream
+  // Audio level analysis for local and remote streams
   const localAudioLevel = useAudioLevel(() => connection.media.localStream());
+  const remoteAudioLevel = useAudioLevel(() => connection.remoteStream());
 
-  // Sync audio level to store
+  // Sync audio levels to store
   createEffect(() => {
     appStore.setLocalAudioLevel(localAudioLevel());
+  });
+
+  createEffect(() => {
+    appStore.setRemoteAudioLevel(remoteAudioLevel());
   });
 
   // Sync local stream to video element and start ASCII conversion
