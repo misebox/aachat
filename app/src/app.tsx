@@ -68,6 +68,10 @@ export default function App(props: ParentProps) {
   onMount(() => {
     document.title = APP_TITLE;
 
+    // Load fps from settings
+    const settings = loadSettings();
+    appStore.setFps(settings.fps);
+
     if (canvasRef) {
       connection.ascii.initCanvas(canvasRef);
     }
@@ -212,7 +216,7 @@ export default function App(props: ParentProps) {
     await connection.media.getAvailableDevices();
   };
 
-  const handleApplyDevices = async (videoDeviceId: string, audioDeviceId: string) => {
+  const handleApplyDevices = async (videoDeviceId: string, audioDeviceId: string, fps: number) => {
     const pc = connection.webrtc.peerConnection();
 
     if (videoDeviceId !== connection.media.selectedVideoId()) {
@@ -225,10 +229,14 @@ export default function App(props: ParentProps) {
       appStore.setSelectedAudioDevice(audioDeviceId);
     }
 
+    // Update FPS
+    appStore.setFps(fps);
+
     // Save to localStorage
     saveSettings({
       selectedVideoDevice: videoDeviceId,
       selectedAudioDevice: audioDeviceId,
+      fps,
     });
   };
 

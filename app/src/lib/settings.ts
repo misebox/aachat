@@ -3,11 +3,13 @@ const STORAGE_KEY = 'aachat_settings';
 export interface Settings {
   selectedVideoDevice: string;
   selectedAudioDevice: string;
+  fps: number;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   selectedVideoDevice: '',
   selectedAudioDevice: '',
+  fps: 30,
 };
 
 export function loadSettings(): Settings {
@@ -18,17 +20,18 @@ export function loadSettings(): Settings {
     const parsed = JSON.parse(stored);
 
     // Validate structure
-    if (
-      typeof parsed !== 'object' ||
-      typeof parsed.selectedVideoDevice !== 'string' ||
-      typeof parsed.selectedAudioDevice !== 'string'
-    ) {
+    if (typeof parsed !== 'object') {
       console.warn('Invalid settings in localStorage, clearing');
       localStorage.removeItem(STORAGE_KEY);
       return { ...DEFAULT_SETTINGS };
     }
 
-    return parsed as Settings;
+    // Merge with defaults for backward compatibility
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      fps: typeof parsed.fps === 'number' ? parsed.fps : DEFAULT_SETTINGS.fps,
+    };
   } catch {
     console.warn('Failed to load settings, using defaults');
     localStorage.removeItem(STORAGE_KEY);

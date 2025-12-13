@@ -1,5 +1,6 @@
-import { createSignal, onCleanup } from 'solid-js';
+import { createSignal, createEffect, onCleanup } from 'solid-js';
 import { ASCII_CHARS, CHAR_COUNT, AA_WIDTH, AA_HEIGHT } from '@/lib/constants';
+import { appStore } from '@/store/app';
 
 /**
  * Hook for video to ASCII art conversion
@@ -140,39 +141,71 @@ export function useAscii() {
     }
   }
 
+  let localVideoRef: HTMLVideoElement | null = null;
+  let remoteVideoRef: HTMLVideoElement | null = null;
+  let currentFps = 30;
+
   /**
    * Start continuous conversion
    */
   function startConversion(localVideo: HTMLVideoElement, remoteVideo?: HTMLVideoElement): void {
-    stopConversion();
+    localVideoRef = localVideo;
+    remoteVideoRef = remoteVideo ?? null;
+    restartConversionTimer();
 
     // Contrast analysis every second
+    if (contrastTimer !== null) {
+      clearInterval(contrastTimer);
+    }
     contrastTimer = window.setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
         analyzeContrast(localVideo);
       }
     }, 1000);
+  }
 
-    // ASCII conversion at ~60fps
+  /**
+   * Restart conversion timer with current FPS
+   */
+  function restartConversionTimer(): void {
+    if (conversionTimer !== null) {
+      clearInterval(conversionTimer);
+      conversionTimer = null;
+    }
+
+    if (!localVideoRef) return;
+
+    const fps = appStore.fps();
+    currentFps = fps;
+    const interval = Math.round(1000 / fps);
+
     conversionTimer = window.setInterval(() => {
-      if (localVideo.srcObject && localVideo.videoWidth > 0) {
-        setLocalAscii(videoToAscii(localVideo));
+      if (localVideoRef && localVideoRef.srcObject && localVideoRef.videoWidth > 0) {
+        setLocalAscii(videoToAscii(localVideoRef));
       }
 
-      if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
-        setRemoteAscii(videoToAscii(remoteVideo));
-      } else if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth === 0) {
+      if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth > 0) {
+        setRemoteAscii(videoToAscii(remoteVideoRef));
+      } else if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth === 0) {
         const now = Date.now();
         if (now - lastRemoteVideoLogTime > 5000) {
           console.log('Remote video has stream but no dimensions:', {
-            readyState: remoteVideo.readyState,
-            paused: remoteVideo.paused,
+            readyState: remoteVideoRef.readyState,
+            paused: remoteVideoRef.paused,
           });
           lastRemoteVideoLogTime = now;
         }
       }
-    }, 16);
+    }, interval);
   }
+
+  // Watch for FPS changes and restart timer
+  createEffect(() => {
+    const fps = appStore.fps();
+    if (fps !== currentFps && localVideoRef) {
+      restartConversionTimer();
+    }
+  });
 
   /**
    * Stop conversion

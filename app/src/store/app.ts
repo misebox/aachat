@@ -43,6 +43,9 @@ const [remoteAudioLevel, setRemoteAudioLevel] = createSignal(0);
 // Layout
 const [videoAreaCount, setVideoAreaCount] = createSignal(2);
 
+// Quality
+const [fps, setFps] = createSignal(30);
+
 // Computed: is connected
 const isConnected = () => connectionState() === 'connected';
 const isConnecting = () => connectionState() === 'connecting';
@@ -112,6 +115,10 @@ export const appStore = {
   // Layout
   videoAreaCount,
   setVideoAreaCount,
+
+  // Quality
+  fps,
+  setFps,
 
   // Computed
   isConnected,

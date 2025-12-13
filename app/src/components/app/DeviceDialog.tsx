@@ -1,4 +1,4 @@
-import { Component, createSignal, createEffect } from 'solid-js';
+import { Component, createSignal, createEffect, For } from 'solid-js';
 import {
   Dialog,
   DialogContent,
@@ -10,14 +10,17 @@ import { Button } from '@/components/ui/button';
 import { DeviceSelector } from './DeviceSelector';
 import { appStore } from '@/store/app';
 
+const FPS_OPTIONS = [5, 10, 30, 60] as const;
+
 interface DeviceDialogProps {
   onRefresh: () => Promise<void>;
-  onApply: (videoDeviceId: string, audioDeviceId: string) => void;
+  onApply: (videoDeviceId: string, audioDeviceId: string, fps: number) => void;
 }
 
 export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
   const [tempVideoDevice, setTempVideoDevice] = createSignal('');
   const [tempAudioDevice, setTempAudioDevice] = createSignal('');
+  const [tempFps, setTempFps] = createSignal(30);
 
   // When dialog opens, refresh devices and sync current selection
   createEffect(() => {
@@ -25,6 +28,7 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
       // Sync current selection first
       setTempVideoDevice(appStore.selectedVideoDevice());
       setTempAudioDevice(appStore.selectedAudioDevice());
+      setTempFps(appStore.fps());
       // Then refresh device list
       props.onRefresh();
     }
@@ -60,7 +64,7 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
   });
 
   const handleApply = () => {
-    props.onApply(tempVideoDevice(), tempAudioDevice());
+    props.onApply(tempVideoDevice(), tempAudioDevice(), tempFps());
     appStore.setDeviceDialogOpen(false);
   };
 
@@ -68,22 +72,51 @@ export const DeviceDialog: Component<DeviceDialogProps> = (props) => {
     <Dialog open={appStore.deviceDialogOpen()} onOpenChange={appStore.setDeviceDialogOpen}>
       <DialogContent class="bg-neutral-900 border-gray-600 text-white max-w-md">
         <DialogHeader>
-          <DialogTitle>Device Settings</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <div class="space-y-4 py-4">
-          <DeviceSelector
-            label="Video"
-            value={tempVideoDevice()}
-            onChange={setTempVideoDevice}
-            devices={appStore.videoDevices()}
-          />
-          <DeviceSelector
-            label="Audio"
-            value={tempAudioDevice()}
-            onChange={setTempAudioDevice}
-            devices={appStore.audioDevices()}
-          />
+        <div class="space-y-6 py-4">
+          {/* Device Section */}
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium text-gray-400">Device</h3>
+            <DeviceSelector
+              label="Video"
+              value={tempVideoDevice()}
+              onChange={setTempVideoDevice}
+              devices={appStore.videoDevices()}
+            />
+            <DeviceSelector
+              label="Audio"
+              value={tempAudioDevice()}
+              onChange={setTempAudioDevice}
+              devices={appStore.audioDevices()}
+            />
+          </div>
+
+          {/* Quality Section */}
+          <div class="space-y-3">
+            <h3 class="text-sm font-medium text-gray-400">Quality</h3>
+            <div class="space-y-1">
+              <label class="text-sm text-gray-300">FPS</label>
+              <div class="flex gap-2">
+                <For each={FPS_OPTIONS}>
+                  {(fps) => (
+                    <button
+                      type="button"
+                      class={`flex-1 px-3 py-2 rounded text-sm transition-colors ${
+                        tempFps() === fps
+                          ? 'bg-white text-black'
+                          : 'bg-gray-800 text-white hover:bg-gray-700'
+                      }`}
+                      onClick={() => setTempFps(fps)}
+                    >
+                      {fps}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter class="flex flex-row gap-2">
