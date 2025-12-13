@@ -260,6 +260,9 @@ export default function App(props: ParentProps) {
     );
     if (success) {
       appStore.setCameraReady(true);
+      // Apply current video/audio enabled state to the new stream
+      connection.media.setVideoEnabled(appStore.videoEnabled());
+      connection.media.setAudioEnabled(appStore.audioEnabled());
     }
   };
 
