@@ -74,7 +74,7 @@ export const ShareDialog: Component<ShareDialogProps> = (props) => {
           <div class="flex flex-col items-center gap-4">
             {/* QR Code */}
             <Show when={qrDataUrl()}>
-              <div class="bg-white p-2 rounded">
+              <div class="bg-white p-8 m-8 rounded">
                 <img src={qrDataUrl()} alt="QR Code" width={200} height={200} />
               </div>
             </Show>
