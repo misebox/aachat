@@ -15,9 +15,11 @@ export function useAscii() {
   let contrastTimer: number | null = null;
   let conversionTimer: number | null = null;
 
-  // Dynamic range for contrast adjustment
-  let minBrightness = 0;
-  let maxBrightness = 255;
+  // Dynamic range for contrast adjustment (separate for local and remote)
+  let localMinBrightness = 0;
+  let localMaxBrightness = 255;
+  let remoteMinBrightness = 0;
+  let remoteMaxBrightness = 255;
   let lastRemoteVideoLogTime = 0;
 
   onCleanup(() => {
@@ -35,7 +37,7 @@ export function useAscii() {
   /**
    * Convert video frame to ASCII art
    */
-  function videoToAscii(video: HTMLVideoElement): string {
+  function videoToAscii(video: HTMLVideoElement, variant: 'local' | 'remote'): string {
     if (!canvas || !ctx || !video.videoWidth || !video.videoHeight) {
       return '';
     }
@@ -46,6 +48,9 @@ export function useAscii() {
     ctx.drawImage(video, 0, 0, AA_WIDTH, AA_HEIGHT);
     const imageData = ctx.getImageData(0, 0, AA_WIDTH, AA_HEIGHT);
     const pixels = imageData.data;
+
+    const minBrightness = variant === 'local' ? localMinBrightness : remoteMinBrightness;
+    const maxBrightness = variant === 'local' ? localMaxBrightness : remoteMaxBrightness;
 
     let ascii = '';
 
@@ -74,7 +79,7 @@ export function useAscii() {
   /**
    * Analyze video for contrast adjustment
    */
-  function analyzeContrast(video: HTMLVideoElement): void {
+  function analyzeContrast(video: HTMLVideoElement, variant: 'local' | 'remote'): void {
     if (!canvas || !ctx || !video.videoWidth || !video.videoHeight) {
       return;
     }
@@ -117,27 +122,38 @@ export function useAscii() {
     const percentile5 = brightnessValues[Math.floor(count * 0.05)];
     const percentile95 = brightnessValues[Math.floor(count * 0.95)];
 
+    let newMin: number;
+    let newMax: number;
+
     // Adjust range based on image characteristics
     if (stdDev < 20) {
       // Low contrast image
-      minBrightness = Math.max(0, mean - stdDev * 3);
-      maxBrightness = Math.min(255, mean + stdDev * 3);
+      newMin = Math.max(0, mean - stdDev * 3);
+      newMax = Math.min(255, mean + stdDev * 3);
     } else if (stdDev > 60) {
       // High contrast image
-      minBrightness = Math.max(0, percentile5 - 10);
-      maxBrightness = Math.min(255, percentile95 + 10);
+      newMin = Math.max(0, percentile5 - 10);
+      newMax = Math.min(255, percentile95 + 10);
     } else {
       // Normal contrast
       const margin = stdDev * 0.5;
-      minBrightness = Math.max(0, min - margin);
-      maxBrightness = Math.min(255, max + margin);
+      newMin = Math.max(0, min - margin);
+      newMax = Math.min(255, max + margin);
     }
 
     // Ensure minimum range
-    if (maxBrightness - minBrightness < 30) {
-      const center = (minBrightness + maxBrightness) / 2;
-      minBrightness = Math.max(0, center - 15);
-      maxBrightness = Math.min(255, center + 15);
+    if (newMax - newMin < 30) {
+      const center = (newMin + newMax) / 2;
+      newMin = Math.max(0, center - 15);
+      newMax = Math.min(255, center + 15);
+    }
+
+    if (variant === 'local') {
+      localMinBrightness = newMin;
+      localMaxBrightness = newMax;
+    } else {
+      remoteMinBrightness = newMin;
+      remoteMaxBrightness = newMax;
     }
   }
 
@@ -159,7 +175,10 @@ export function useAscii() {
     }
     contrastTimer = window.setInterval(() => {
       if (localVideo.srcObject && localVideo.videoWidth > 0) {
-        analyzeContrast(localVideo);
+        analyzeContrast(localVideo, 'local');
+      }
+      if (remoteVideo && remoteVideo.srcObject && remoteVideo.videoWidth > 0) {
+        analyzeContrast(remoteVideo, 'remote');
       }
     }, 1000);
   }
@@ -181,11 +200,11 @@ export function useAscii() {
 
     conversionTimer = window.setInterval(() => {
       if (localVideoRef && localVideoRef.srcObject && localVideoRef.videoWidth > 0) {
-        setLocalAscii(videoToAscii(localVideoRef));
+        setLocalAscii(videoToAscii(localVideoRef, 'local'));
       }
 
       if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth > 0) {
-        setRemoteAscii(videoToAscii(remoteVideoRef));
+        setRemoteAscii(videoToAscii(remoteVideoRef, 'remote'));
       } else if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth === 0) {
         const now = Date.now();
         if (now - lastRemoteVideoLogTime > 5000) {
