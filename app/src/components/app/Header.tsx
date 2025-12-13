@@ -15,22 +15,13 @@ export const Header: Component<HeaderProps> = (props) => {
     <header class="relative flex items-center">
       {/* Left: AACHAT */}
       <h1 class="text-base font-normal text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] pl-2 py-0">
-        <Show
-          when={props.onNavigateHome}
-          fallback={
-            <a href="/" class="text-white no-underline hover:opacity-80 text-lg">
-              {APP_TITLE}
-            </a>
-          }
+        <Button
+          variant="ghost"
+          onClick={props.onNavigateHome ?? (() => {})}
+          class="text-white text-lg font-normal px-2 h-auto hover:bg-gray-800 drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
         >
-          <Button
-            variant="ghost"
-            onClick={props.onNavigateHome}
-            class="text-white text-lg font-normal px-2 h-auto hover:bg-gray-800 drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
-          >
-            {APP_TITLE}
-          </Button>
-        </Show>
+          {APP_TITLE}
+        </Button>
       </h1>
 
       {/* Center: Subtitle (DirectPage only) */}
