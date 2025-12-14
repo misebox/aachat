@@ -9,6 +9,7 @@ import {
   MAX_OFFER_PUT_RETRIES,
 } from '@/lib/constants';
 import { generateSessionToken } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 import { useSignaling } from './useSignaling';
 import { useSession } from './useSession';
 import { useWebRTC } from './useWebRTC';
@@ -75,7 +76,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
       const label = formatConnectionType(connectionType);
       callbacks.onConnectionTypeChange?.(connectionType);
       callbacks.onConnected?.();
-      callbacks.onStatusChange?.(label ? `Connected (${label})` : 'Connected');
+      callbacks.onStatusChange?.(label ? t('connectedWith', { label }) : t('connected'));
     },
     onDisconnected: () => {
       // Clear remote stream immediately when peer disconnects
@@ -89,7 +90,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
       if (session.connectionEstablished()) {
         const keyword = session.currentKeyword();
         if (keyword) {
-          callbacks.onStatusChange?.('Peer disconnected. Reconnecting...');
+          callbacks.onStatusChange?.(t('peerDisconnectedReconnecting'));
           reconnect(keyword);
           return;
         }
@@ -136,7 +137,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 1. Start camera (skip if already running)
     if (!media.localStream()) {
-      callbacks.onStatusChange?.('Starting camera...');
+      callbacks.onStatusChange?.(t('startingCamera'));
       const cameraStarted = await media.startCamera();
       if (!cameraStarted) {
         callbacks.onError?.('Failed to start camera');
@@ -152,7 +153,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     signaling.setCancelKey(session.sessionToken() || generateSessionToken());
 
     // 3. Create PeerConnection
-    callbacks.onStatusChange?.('Setting up connection...');
+    callbacks.onStatusChange?.(t('settingUpConnection'));
     const localStream = media.localStream();
     if (!localStream) {
       callbacks.onError?.('No local stream');
@@ -185,7 +186,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
         return false;
       }
 
-      callbacks.onStatusChange?.(`Waiting for guest... (${attempt}/${MAX_OFFER_PUT_RETRIES})`);
+      callbacks.onStatusChange?.(t('waitingForGuest', { attempt, max: MAX_OFFER_PUT_RETRIES }));
 
       putResult = await signaling.send(
         offerPath,
@@ -223,7 +224,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 7. GET answer
     session.setState(SessionState.H_ANSWER_GET);
-    callbacks.onStatusChange?.('Receiving answer...');
+    callbacks.onStatusChange?.(t('receivingAnswer'));
 
     const answerPath = session.getChannelPath('answer');
     const answerData = await signaling.receive<{ type: string; sdp: string }>(
@@ -276,7 +277,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 1. Start camera (skip if already running)
     if (!media.localStream()) {
-      callbacks.onStatusChange?.('Starting camera...');
+      callbacks.onStatusChange?.(t('startingCamera'));
       const cameraStarted = await media.startCamera();
       if (!cameraStarted) {
         callbacks.onError?.('Failed to start camera');
@@ -293,7 +294,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 2. GET offer
     session.setState(SessionState.G_OFFER_GET);
-    callbacks.onStatusChange?.('Connecting to host...');
+    callbacks.onStatusChange?.(t('connectingToHost'));
     startKeywordTimer();
 
     const offerPath = session.getChannelPath('offer');
@@ -316,7 +317,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
     }
 
     // 4. Create PeerConnection
-    callbacks.onStatusChange?.('Setting up connection...');
+    callbacks.onStatusChange?.(t('settingUpConnection'));
     const localStream = media.localStream();
     if (!localStream) {
       callbacks.onError?.('No local stream');
@@ -337,7 +338,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // 7. Create Answer
     session.setState(SessionState.G_ANSWER_PUT);
-    callbacks.onStatusChange?.('Sending answer...');
+    callbacks.onStatusChange?.(t('sendingAnswer'));
 
     const answer = await webrtc.createAnswer();
     logger.sig('Answer created');
@@ -511,7 +512,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
       }
     } catch (error) {
       logger.error('SIG', 'reconnect error:', error);
-      callbacks.onStatusChange?.('Reconnection failed');
+      callbacks.onStatusChange?.(t('reconnectionFailed'));
       setTimeout(() => reconnect(keyword), RETRY_DELAY);
     }
   }
@@ -529,7 +530,7 @@ export function useConnection(callbacks: ConnectionCallbacks = {}) {
 
     // HEAD check to determine role (no hash, just keyword/offer)
     session.setState(SessionState.HEAD_CHECK);
-    callbacks.onStatusChange?.('Checking room...');
+    callbacks.onStatusChange?.(t('checkingRoom'));
 
     try {
       const offerPath = `${keyword}/offer`;
