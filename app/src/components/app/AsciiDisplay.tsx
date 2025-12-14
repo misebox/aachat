@@ -13,17 +13,17 @@ export const AsciiDisplay: Component<AsciiDisplayProps> = (props) => {
   const fontSize = () => props.fontSize;
 
   // padding(2px) + border(2px if enabled)
-  const extraWidth = () => hasBorder() ? 4 : 2;
+  const extraSize = () => hasBorder() ? 4 : 2;
 
   return (
     <pre
-      class={`aa-display bg-black rounded-sm font-mono text-white whitespace-pre overflow-hidden leading-none block box-border shrink-0 ${hasBorder() ? 'border border-gray-700' : ''}`}
+      class={`aa-display bg-gray-950 rounded-sm font-mono text-white whitespace-pre overflow-hidden leading-none block box-border ${hasBorder() ? 'border border-gray-700' : ''}`}
       style={{
         'font-size': fontSize(),
         'line-height': fontSize(),
         'letter-spacing': `calc(${fontSize()} * 0.4)`,
-        width: `calc(${props.width} * ${fontSize()} * 0.6 + ${props.width - 1} * ${fontSize()} * 0.4 + ${extraWidth()}px)`,
-        height: `calc(${props.height} * ${fontSize()})`,
+        width: `calc(${props.width} * ${fontSize()} * 0.6 + ${props.width - 1} * ${fontSize()} * 0.4 + ${extraSize()}px)`,
+        height: `calc(${props.height}lh + ${extraSize()}px)`,
         margin: '1px',
         padding: '1px',
       }}

@@ -25,7 +25,7 @@
 html, body {
   background: black;
   color: white;
-  font-family: "Courier New", monospace;
+  font-family: "Courier Prime", "Courier New", monospace;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -37,7 +37,7 @@ html, body {
 
 /* AA Display base styles */
 .aa-display {
-  font-family: "Courier New", monospace;
+  font-family: "Courier Prime", "Courier New", monospace;
 }
 
 /* Clickable elements */
