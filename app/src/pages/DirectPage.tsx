@@ -77,11 +77,11 @@ export const DirectPage = () => {
         appStore.setStatusText(t('connectionFailedAfterRetries', { count: MAX_DIRECT_CONNECT_RETRIES }));
         return;
       }
-      // Retry after short delay
+      // Retry after short delay (keep connecting state to show Leave button)
+      appStore.setConnectionState('connecting');
       setTimeout(() => {
-        appStore.setConnectionState('idle');
         connection.connect();
-      }, 2000);
+      }, 1000);
     }
   }));
 
