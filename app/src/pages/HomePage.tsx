@@ -1,4 +1,4 @@
-import { onMount, onCleanup } from 'solid-js';
+import { onMount, onCleanup, Show } from 'solid-js';
 import { useSearchParams, useNavigate, useLocation } from '@solidjs/router';
 import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
 import { useTranslation } from '@/lib/i18n';
+import { AA_HEIGHT, AA_WIDTH } from '@/lib';
 
 export const HomePage = () => {
   const { t } = useTranslation();
@@ -125,18 +126,33 @@ export const HomePage = () => {
 
       <StatusBar variant="desktop" />
 
-      {/* Main content area - flex to push content down */}
-      <div class="flex flex-col justify-around gap-8">
-        {/* Tagline - above video area */}
-        <div class="text-center px-4 py-2 text-gray-400 text-xs">
-          <Typewriter
-            class="text-base"
-            text={descriptionTagline()}
-            speed={80}
-          />
-        </div>
-
-        <div class="flex flex-col items-center gap-4">
+      {/* Main content area */}
+      <div class="flex flex-col justify-start items-center gap-4 pt-8">
+        <Show
+          when={appStore.cameraReady()}
+          fallback={
+            <div class="relative text-center shrink-0 max-w-full overflow-hidden">
+              <h3 class="absolute top-1 left-1 z-10 bg-black/80 px-2 py-1 rounded text-white text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] m-0 md:relative md:top-auto md:left-auto md:bg-transparent md:mb-1 invisible">
+                &nbsp;
+              </h3>
+              <div
+                class="flex items-center justify-center text-center px-4 text-gray-400"
+                style={{
+                  width: `calc(${AA_WIDTH} * var(--aa-font-size, 10px) * 0.6 + ${AA_WIDTH - 1} * var(--aa-font-size, 10px) * 0.4 + 4px)`,
+                  height: `calc(${AA_HEIGHT}lh + 4px)`,
+                  'font-size': 'var(--aa-font-size, 10px)',
+                  'line-height': 'var(--aa-font-size, 10px)',
+                }}
+              >
+                <Typewriter
+                  class="text-sm md:text-lg"
+                  text={descriptionTagline()}
+                  speed={80}
+                />
+              </div>
+            </div>
+          }
+        >
           <VideoContainer
             title={t('you')}
             asciiContent={appStore.localAscii()}
@@ -145,15 +161,15 @@ export const HomePage = () => {
             muted={true}
             videoRef={connection.setLocalVideoRef}
           />
+        </Show>
 
-          <Button
-            variant="outline"
-            onClick={handleToggleCamera}
-            class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
-          >
-            {appStore.cameraReady() ? t('stopTest') : t('testDevice')}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={handleToggleCamera}
+          class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
+        >
+          {appStore.cameraReady() ? t('stopTest') : t('testDevice')}
+        </Button>
       </div>
     </div>
   );
