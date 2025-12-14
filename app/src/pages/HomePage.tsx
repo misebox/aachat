@@ -127,7 +127,7 @@ export const HomePage = () => {
       <StatusBar variant="desktop" />
 
       {/* Main content area */}
-      <div class="flex flex-col justify-start items-center gap-4 pt-8">
+      <div class="flex flex-col justify-start items-center gap-2 pt-4">
         <Show
           when={appStore.cameraReady()}
           fallback={
