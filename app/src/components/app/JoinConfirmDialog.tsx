@@ -23,7 +23,7 @@ export const JoinConfirmDialog: Component<JoinConfirmDialogProps> = (props) => {
         <div class="space-y-4 text-sm leading-relaxed">
           <p class="text-gray-300">{t('joinConfirmMessage')}</p>
 
-          <p class="text-center text-lg font-mono text-white bg-neutral-800 px-4 py-2 rounded">
+          <p class="text-center text-lg font-mono text-white bg-neutral-800 px-4 py-2 rounded break-all">
             {props.keyword}
           </p>
 
