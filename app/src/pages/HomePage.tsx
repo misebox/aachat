@@ -145,7 +145,7 @@ export const HomePage = () => {
                 }}
               >
                 <Typewriter
-                  class="text-sm md:text-lg"
+                  class="text-lg md:text-xl"
                   text={descriptionTagline()}
                   speed={80}
                 />

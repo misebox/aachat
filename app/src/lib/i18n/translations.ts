@@ -174,7 +174,7 @@ export const translations = {
     peerDisconnectedReconnecting: '相手が切断しました。再接続中...',
     startingCamera: 'カメラ起動中...',
     settingUpConnection: '接続を準備中...',
-    waitingForGuest: '相手を待機中... ({attempt}/{max})',
+    waitingForGuest: '接続を待ち受け中... ({attempt}/{max})',
     receivingAnswer: '応答を受信中...',
     connectingToHost: 'ホストに接続中...',
     sendingAnswer: '応答を送信中...',
@@ -189,9 +189,9 @@ export const translations = {
     tagline: [
       'アスキーアートでビデオチャット',
       'リアルタイムでP2P接続',
-      '登録不要・追跡なし',
+      '登録不要・トラッキング無し',
       'キーワードを共有するだけ',
-      '顔がアスキーアートになります',
+      '顔がアスキーアートになる',
     ].join('\n'),
   },
 } as const;
