@@ -127,14 +127,11 @@ export const HomePage = () => {
       <StatusBar variant="desktop" />
 
       {/* Main content area */}
-      <div class="flex flex-col justify-start items-center gap-2 pt-4">
+      <div class="flex flex-col justify-start items-center gap-2 pt-2">
         <Show
           when={appStore.cameraReady()}
           fallback={
             <div class="relative text-center shrink-0 max-w-full overflow-hidden">
-              <h3 class="absolute top-1 left-1 z-10 bg-black/80 px-2 py-1 rounded text-white text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] m-0 md:relative md:top-auto md:left-auto md:bg-transparent md:mb-1 invisible">
-                &nbsp;
-              </h3>
               <div
                 class="flex items-center justify-center text-center px-4 text-gray-400"
                 style={{
@@ -150,6 +147,9 @@ export const HomePage = () => {
                   speed={80}
                 />
               </div>
+              <h3 class="absolute top-1 left-1 z-10 bg-black/80 px-2 py-1 rounded text-white text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] m-0 md:relative md:top-auto md:left-auto md:bg-transparent md:mb-1 invisible">
+                &nbsp;
+              </h3>
             </div>
           }
         >
