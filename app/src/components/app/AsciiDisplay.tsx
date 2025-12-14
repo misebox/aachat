@@ -17,13 +17,13 @@ export const AsciiDisplay: Component<AsciiDisplayProps> = (props) => {
 
   return (
     <pre
-      class={`aa-display bg-black rounded-sm font-mono font-normal text-white whitespace-pre overflow-hidden leading-none block box-border shrink-0 ${hasBorder() ? 'border border-gray-700' : ''}`}
+      class={`aa-display bg-black rounded-sm font-mono text-white whitespace-pre overflow-hidden leading-none block box-border shrink-0 ${hasBorder() ? 'border border-gray-700' : ''}`}
       style={{
         'font-size': fontSize(),
-        'line-height': '1em',
+        'line-height': fontSize(),
         'letter-spacing': `calc(${fontSize()} * 0.4)`,
         width: `calc(${props.width} * ${fontSize()} * 0.6 + ${props.width - 1} * ${fontSize()} * 0.4 + ${extraWidth()}px)`,
-        height: `calc(${props.height} * 1em)`,
+        height: `calc(${props.height} * ${fontSize()})`,
         margin: '1px',
         padding: '1px',
       }}
