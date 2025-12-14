@@ -26,7 +26,7 @@ export const Header: Component<HeaderProps> = (props) => {
 
       {/* Center: Subtitle (DirectPage only) */}
       <Show when={props.subtitle}>
-        <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-normal text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+        <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-base font-normal text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] ">
           {props.subtitle}
         </span>
       </Show>
