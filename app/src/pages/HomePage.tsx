@@ -8,12 +8,11 @@ import {
   VideoContainer,
   KeywordInput,
   IconButton,
-  Typewriter,
+  AsciiTitle,
 } from '@/components/app';
 import { appStore } from '@/store/app';
 import { useConnectionContext } from '@/context/connection';
 import { useTranslation } from '@/lib/i18n';
-import { AA_HEIGHT, AA_WIDTH } from '@/lib';
 
 export const HomePage = () => {
   const { t } = useTranslation();
@@ -131,25 +130,11 @@ export const HomePage = () => {
         <Show
           when={appStore.cameraReady()}
           fallback={
-            <div class="relative text-center shrink-0 max-w-full overflow-hidden">
-              <div
-                class="flex items-center justify-center text-center px-4 text-gray-400"
-                style={{
-                  width: `calc(${AA_WIDTH} * var(--aa-font-size, 10px) * 0.6 + ${AA_WIDTH - 1} * var(--aa-font-size, 10px) * 0.4 + 4px)`,
-                  height: `calc(${AA_HEIGHT}lh + 4px)`,
-                  'font-size': 'var(--aa-font-size, 10px)',
-                  'line-height': 'var(--aa-font-size, 10px)',
-                }}
-              >
-                <Typewriter
-                  class="text-lg md:text-xl"
-                  text={descriptionTagline()}
-                  speed={80}
-                />
-              </div>
-              <h3 class="absolute top-1 left-1 z-10 bg-black/80 px-2 py-1 rounded text-white text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] m-0 md:relative md:top-auto md:left-auto md:bg-transparent md:mb-1 invisible">
-                &nbsp;
-              </h3>
+            <div class="relative text-center shrink-0 max-w-full overflow-hidden px-4">
+              <AsciiTitle
+                tagline={descriptionTagline()}
+                speed={80}
+              />
             </div>
           }
         >
