@@ -263,6 +263,11 @@ export default function App(props: ParentProps) {
     });
     if (success) {
       appStore.setCameraReady(true);
+    } else {
+      // Without this the button just returns to its idle label and the user
+      // cannot tell the click did anything.
+      appStore.setStatusText(t('cameraStartFailed'));
+      setTimeout(() => appStore.setStatusText(''), 5000);
     }
   };
 

@@ -1,6 +1,14 @@
-import { onMount, onCleanup, Show } from 'solid-js';
+import { onMount, onCleanup, Show, createSignal } from 'solid-js';
 import { useSearchParams, useNavigate, useLocation } from '@solidjs/router';
-import { FiSettings, FiShare2, FiVideo, FiVideoOff, FiMic, FiMicOff } from 'solid-icons/fi';
+import {
+  FiSettings,
+  FiShare2,
+  FiVideo,
+  FiVideoOff,
+  FiMic,
+  FiMicOff,
+  FiLoader,
+} from 'solid-icons/fi';
 import { Button } from '@/components/ui/button';
 import {
   Header,
@@ -36,12 +44,29 @@ export const HomePage = () => {
     appStore.setVideoAreaCount(2);
   });
 
-  const handleToggleCamera = () => {
-    if (appStore.cameraReady()) {
-      connection.stopCamera();
-    } else {
-      connection.startCamera();
+  // startCamera retries getUserMedia at several resolutions, so it can take
+  // seconds. Block re-entry and let the button show it is working.
+  const [cameraBusy, setCameraBusy] = createSignal(false);
+
+  const handleToggleCamera = async () => {
+    if (cameraBusy()) return;
+    setCameraBusy(true);
+    try {
+      if (appStore.cameraReady()) {
+        connection.stopCamera();
+      } else {
+        await connection.startCamera();
+      }
+    } finally {
+      setCameraBusy(false);
     }
+  };
+
+  const cameraButtonLabel = () => {
+    if (cameraBusy()) {
+      return appStore.cameraReady() ? t('stoppingCamera') : t('startingCamera');
+    }
+    return appStore.cameraReady() ? t('stopTest') : t('testDevice');
   };
 
   const handleEnter = () => {
@@ -151,9 +176,14 @@ export const HomePage = () => {
         <Button
           variant="outline"
           onClick={handleToggleCamera}
-          class="border-gray-600 text-white hover:bg-gray-800 hover:border-white"
+          disabled={cameraBusy()}
+          aria-busy={cameraBusy()}
+          class="border-gray-600 text-white hover:bg-gray-800 hover:border-white transition-transform duration-75 active:scale-95 active:bg-gray-700 disabled:opacity-100 disabled:border-white disabled:cursor-wait"
         >
-          {appStore.cameraReady() ? t('stopTest') : t('testDevice')}
+          <Show when={cameraBusy()}>
+            <FiLoader size={16} class="animate-spin mr-2" />
+          </Show>
+          {cameraButtonLabel()}
         </Button>
       </div>
     </div>
