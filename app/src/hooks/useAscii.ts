@@ -40,7 +40,7 @@ export function useAscii() {
   /**
    * Convert video frame to ASCII art
    */
-  function videoToAscii(video: HTMLVideoElement, brightness: BrightnessRange): string {
+  function videoToAscii(video: HTMLVideoElement, brightness: BrightnessRange, mirrored: boolean): string {
     if (!canvas || !ctx || !video.videoWidth || !video.videoHeight) {
       return '';
     }
@@ -56,7 +56,8 @@ export function useAscii() {
 
     for (let y = 0; y < AA_HEIGHT; y++) {
       for (let x = 0; x < AA_WIDTH; x++) {
-        const i = (y * AA_WIDTH + x) * 4;
+        const sourceX = mirrored ? AA_WIDTH - 1 - x : x;
+        const i = (y * AA_WIDTH + sourceX) * 4;
         let pixelBrightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
 
         // Apply dynamic range normalization if enabled
@@ -197,11 +198,11 @@ export function useAscii() {
 
     conversionTimer = setInterval(() => {
       if (localVideoRef && localVideoRef.srcObject && localVideoRef.videoWidth > 0) {
-        setLocalAscii(videoToAscii(localVideoRef, localBrightness));
+        setLocalAscii(videoToAscii(localVideoRef, localBrightness, true));
       }
 
       if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth > 0) {
-        setRemoteAscii(videoToAscii(remoteVideoRef, remoteBrightness));
+        setRemoteAscii(videoToAscii(remoteVideoRef, remoteBrightness, false));
       } else if (remoteVideoRef && remoteVideoRef.srcObject && remoteVideoRef.videoWidth === 0) {
         const now = Date.now();
         if (now - lastRemoteVideoLogTime > 5000) {
